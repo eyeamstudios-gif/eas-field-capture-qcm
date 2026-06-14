@@ -1,0 +1,15 @@
+{
+  "name": "eas-field-capture-qcm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EAS Field Capture QCM Phase 1 phone-first PWA for field documentation quality control.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "node scripts/build-static.js",
+    "preview": "vite preview --host 0.0.0.0 --outDir dist"
+  },
+  "devDependencies": {
+    "fs-extra": "^11.2.0",
+    "vite": "^5.4.21"
+  }
+}

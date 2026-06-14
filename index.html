@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="description" content="EAS Field Capture QCM — Field documentation quality control for XPD and EAS service pathways">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Field Capture QCM — EAS | UECS</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Field Capture QCM</h1>
+      <div class="subtitle">EAS | UECS Field Capture + QCM Intake</div>
+    </div>
+    <div class="header-actions">
+      <span id="offline-indicator" class="offline-indicator online">Online</span>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- Home -->
+    <section id="screen-home" class="screen active">
+      <h2 class="screen-title">Start Field Capture</h2>
+      <p class="screen-subtitle">EAS Field Capture QCM v1.0 — Documentation quality control before you leave the site.</p>
+
+      <div class="btn-group">
+        <button id="btn-start-project" class="btn btn-primary">Start Field Capture</button>
+        <button id="btn-continue-project" class="btn btn-secondary hidden">Continue Project</button>
+      </div>
+
+      <div class="card" style="margin-top:24px">
+        <div class="card-header">Recent Projects</div>
+        <div id="project-list"></div>
+      </div>
+    </section>
+
+    <!-- Project Intake -->
+    <section id="screen-intake" class="screen">
+      <h2 class="screen-title">Project Intake</h2>
+      <p class="screen-subtitle">Enter project details before field capture.</p>
+
+      <form id="intake-form">
+        <div class="card">
+          <div class="card-header">Project Information</div>
+          <div class="form-group">
+            <label for="project-id">Project ID</label>
+            <input type="text" id="project-id" class="form-control" placeholder="Auto-generated if blank">
+          </div>
+          <div class="form-group">
+            <label for="client-name">Client Name <span class="required">*</span></label>
+            <input type="text" id="client-name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="client-company">Client Company</label>
+            <input type="text" id="client-company" class="form-control">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="client-email">Client Email</label>
+              <input type="email" id="client-email" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="client-phone">Client Phone</label>
+              <input type="tel" id="client-phone" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Site Location</div>
+          <div class="form-group">
+            <label for="project-address">Project Address <span class="required">*</span></label>
+            <input type="text" id="project-address" class="form-control" required>
+          </div>
+          <div class="form-row three">
+            <div class="form-group">
+              <label for="city">City</label>
+              <input type="text" id="city" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="state">State</label>
+              <input type="text" id="state" class="form-control" maxlength="2" placeholder="TX">
+            </div>
+            <div class="form-group">
+              <label for="zip">ZIP</label>
+              <input type="text" id="zip" class="form-control">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Service Pathway</div>
+          <div class="form-group">
+            <label for="pathway-select">Service Pathway <span class="required">*</span></label>
+            <select id="pathway-select" class="form-control" required></select>
+          </div>
+          <div class="form-group">
+            <label for="doc-level">Documentation Level</label>
+            <input type="text" id="doc-level" class="form-control" placeholder="Auto-set from pathway">
+          </div>
+          <div class="form-group">
+            <label for="doc-control">Documentation Control Classification</label>
+            <select id="doc-control" class="form-control">
+              <option value="UECS-Lite">UECS-Lite</option>
+              <option value="UECS-S">UECS-S</option>
+              <option value="UECS-V">UECS-V</option>
+              <option value="Admin Review Required">Admin Review Required</option>
+            </select>
+          </div>
+          <div id="aerial-section" class="hidden">
+            <label style="font-size:0.8rem;color:var(--text-secondary)">Aerial Status (Phase 1 Placeholder)</label>
+            <div class="aerial-options">
+              <label class="aerial-option"><input type="radio" name="aerial_status" value="pending"> Aerial capture pending</label>
+              <label class="aerial-option"><input type="radio" name="aerial_status" value="not_required" checked> Aerial not required</label>
+              <label class="aerial-option"><input type="radio" name="aerial_status" value="separate"> Aerial captured separately</label>
+              <label class="aerial-option"><input type="radio" name="aerial_status" value="ground_only"> Ground-only package</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">Field Details</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="field-user">Field User <span class="required">*</span></label>
+              <input type="text" id="field-user" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="project-date">Date</label>
+              <input type="date" id="project-date" class="form-control">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="weather">Weather</label>
+            <input type="text" id="weather" class="form-control" placeholder="Clear, overcast, etc.">
+          </div>
+          <div class="form-group">
+            <label for="site-access">Site Access Notes</label>
+            <textarea id="site-access" class="form-control"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="purpose">Purpose of Documentation</label>
+            <textarea id="purpose" class="form-control"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="client-notes">Client Notes</label>
+            <textarea id="client-notes" class="form-control"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="internal-notes">Internal Notes</label>
+            <textarea id="internal-notes" class="form-control"></textarea>
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary">Create Project &amp; View Shot List</button>
+          <button type="button" id="btn-back-home" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Shot List -->
+    <section id="screen-shots" class="screen">
+      <h2 class="screen-title">Shot List Dashboard</h2>
+      <p class="screen-subtitle" id="shots-pathway-title"></p>
+      <p id="shots-target" style="color:var(--accent-gold);font-size:0.875rem;margin-bottom:16px"></p>
+
+      <div id="shot-list"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" data-nav="capture">Capture Required Shot</button>
+        <button class="btn btn-secondary" data-nav="screen-dashboard">Project Dashboard</button>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="screen-dashboard" class="screen">
+      <h2 class="screen-title" id="dash-project-id">Project</h2>
+      <p class="screen-subtitle" id="dash-pathway"></p>
+      <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px" id="dash-client"></p>
+
+      <div id="dash-readiness" class="readiness-banner incomplete">Field Capture Incomplete</div>
+      <div class="progress-bar"><div id="dash-progress-fill" class="progress-fill" style="width:0%"></div></div>
+      <p id="dash-progress-text" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:16px"></p>
+
+      <div class="coverage-stats" id="dash-stats"></div>
+
+      <!-- Simple Field Method (XPD Exterior Baseline) -->
+      <div id="sfm-dashboard" class="card hidden">
+        <div class="card-header" id="sfm-method-name">Simple Field Method</div>
+        <p id="sfm-method-desc" class="pass-instruction"></p>
+        <p id="sfm-guidance" class="sfm-guidance"></p>
+
+        <div id="sfm-warnings" class="hidden"></div>
+        <div id="overcapture-warning" class="hidden"></div>
+
+        <div id="ground-capture-dashboard" class="ground-capture-dashboard"></div>
+
+        <div class="pass-card">
+          <h4>Pass 1: Four-Side Exterior Record</h4>
+          <p id="sfm-pass1-status" class="pass-status">0 / 12 required views complete</p>
+        </div>
+        <div class="pass-card">
+          <h4>Pass 2: Controlled Detail Capture</h4>
+          <p id="sfm-pass2-status" class="pass-status">0 / 10 detail categories complete</p>
+        </div>
+        <div class="pass-card">
+          <h4>Pass 3: Final QA Fill</h4>
+          <p id="sfm-pass3-status" class="pass-status">Not started</p>
+        </div>
+
+        <div class="btn-group" style="margin-top:12px">
+          <button type="button" id="btn-start-pass1" class="btn btn-primary">Start Pass 1</button>
+          <button type="button" id="btn-capture-next-view" class="btn btn-primary">Capture Next Required View</button>
+          <button type="button" id="btn-mark-not-accessible" class="btn btn-outline">Mark Not Accessible</button>
+          <button type="button" id="btn-capture-detail" class="btn btn-secondary hidden">Capture Detail</button>
+          <button type="button" id="btn-run-final-qa" class="btn btn-warning hidden">Run Final QA</button>
+          <button type="button" id="btn-view-missing" class="btn btn-outline btn-sm">View Missing Shots</button>
+          <button type="button" id="btn-finish-capture" class="btn btn-success btn-sm">Finish Field Capture</button>
+        </div>
+      </div>
+
+      <div id="site-limitation-panel" class="card hidden">
+        <div class="card-header">Mark Site Limitation</div>
+        <div class="form-group">
+          <label for="site-limitation-target">Required shot</label>
+          <select id="site-limitation-target" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label for="site-limitation-type">Limitation type</label>
+          <select id="site-limitation-type" class="form-control"></select>
+        </div>
+        <div class="form-group">
+          <label for="site-limitation-note">Field note <span class="required">*</span></label>
+          <textarea id="site-limitation-note" class="form-control" placeholder="e.g. Rear elevation partially blocked by locked fence."></textarea>
+        </div>
+        <div class="btn-group row">
+          <button type="button" id="btn-save-site-limitation" class="btn btn-primary">Save Site Limitation</button>
+          <button type="button" id="btn-cancel-site-limitation" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+
+      <nav class="bottom-nav">
+        <button class="nav-tab active" data-nav="screen-dashboard">Dashboard</button>
+        <button class="nav-tab" id="legacy-shots-nav" data-nav="shots">Shots</button>
+        <button class="nav-tab" data-nav="capture">Capture</button>
+        <button class="nav-tab" data-nav="coverage">Coverage</button>
+      </nav>
+
+      <div class="btn-group" id="legacy-dash-actions">
+        <button class="btn btn-primary" data-nav="capture">Capture Required Shot</button>
+        <button class="btn btn-secondary" data-nav="coverage">View Coverage</button>
+        <button class="btn btn-outline btn-sm" data-nav="final">Final Review</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-view-missing-legacy">View Missing Shots</button>
+        <button class="btn btn-success btn-sm" data-nav="export">Export Project Packet</button>
+      </div>
+    </section>
+
+    <!-- Capture -->
+    <section id="screen-capture" class="screen">
+      <h2 class="screen-title">Capture Photo</h2>
+      <p class="screen-subtitle">Use phone camera to capture field documentation.</p>
+      <p id="capture-replacement-notice" class="alert alert-info hidden"></p>
+
+      <div id="capture-sfm-view" class="card hidden">
+        <div class="card-header">Simple Field Method — <span id="capture-pass-label">Pass 1</span></div>
+        <p><strong>Required view:</strong> <span id="capture-view-label">—</span></p>
+      </div>
+
+      <div class="camera-container">
+        <video id="camera-video" autoplay playsinline muted></video>
+        <canvas id="camera-canvas" class="hidden"></canvas>
+        <img id="capture-preview" class="hidden" alt="Preview">
+        <div id="live-camera-section" class="camera-placeholder hidden">
+          <p>Live camera loading...</p>
+        </div>
+      </div>
+
+      <div class="camera-controls">
+        <button id="btn-capture-file" class="btn btn-primary btn-sm" style="width:auto">📷 Capture Photo</button>
+        <button id="btn-capture-live" class="btn btn-secondary btn-sm hidden" style="width:auto">Live Capture</button>
+      </div>
+
+      <div id="capture-meta-section" class="card hidden">
+        <div class="card-header">Image Details</div>
+        <div class="form-group">
+          <label for="capture-zone">Zone / Category</label>
+          <select id="capture-zone" class="form-control"></select>
+        </div>
+        <div id="pass2-classification-section" class="hidden">
+          <div class="form-group">
+            <label for="capture-detail-classification">Detail classification (Pass 2)</label>
+            <select id="capture-detail-classification" class="form-control">
+              <option>Wide context</option>
+              <option>Closeup detail</option>
+              <option>Detail support image</option>
+              <option>Admin review</option>
+            </select>
+          </div>
+          <p class="pass-instruction">Capture detail images only when they help explain the exterior record. Avoid unnecessary duplicates.</p>
+        </div>
+        <div id="pass3-context-section" class="hidden">
+          <div class="form-group">
+            <label for="capture-context-view">Optional context view (Pass 3)</label>
+            <select id="capture-context-view" class="form-control"></select>
+          </div>
+          <div class="form-group">
+            <label for="optional-context-reason">Context justification <span class="required">*</span></label>
+            <input type="text" id="optional-context-reason" class="form-control" placeholder="e.g. Street-facing access and rear-left layout">
+          </div>
+          <p class="pass-instruction">Optional context helps explain layout or access — not to pad the package.</p>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="capture-angle">Angle Type</label>
+            <select id="capture-angle" class="form-control">
+              <option>Wide Context</option>
+              <option>Standard</option>
+              <option>Closeup</option>
+              <option>Detail</option>
+              <option>Overview</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="capture-wide-closeup">Wide or Closeup</label>
+            <select id="capture-wide-closeup" class="form-control">
+              <option>Wide Context</option>
+              <option>Standard</option>
+              <option>Closeup</option>
+            </select>
+          </div>
+        </div>
+        <div id="wide-context-section" class="hidden">
+          <label style="font-size:0.8rem;color:var(--text-secondary)">Is there a wide context image for this condition?</label>
+          <div class="aerial-options">
+            <label class="aerial-option"><input type="radio" name="wide_context" value="yes"> Yes, already captured</label>
+            <label class="aerial-option"><input type="radio" name="wide_context" value="capture_now"> Capture wide context now</label>
+            <label class="aerial-option"><input type="radio" name="wide_context" value="not_applicable"> Not applicable</label>
+            <label class="aerial-option"><input type="radio" name="wide_context" value="admin_review"> Admin review</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="capture-notes">Field Notes</label>
+          <textarea id="capture-notes" class="form-control" placeholder="Visual condition noted, access notes, etc."></textarea>
+        </div>
+        <button id="btn-run-qcm" class="btn btn-secondary hidden">Run QCM</button>
+      </div>
+
+      <div id="qcm-result-panel" class="hidden"></div>
+
+      <div id="capture-actions" class="btn-group hidden">
+        <button id="btn-accept-image" class="btn btn-success">Accept Image</button>
+        <button id="btn-retake" class="btn btn-warning">Retake Image</button>
+        <button id="btn-admin-review" class="btn btn-outline">Mark Admin Review</button>
+      </div>
+
+      <button class="btn btn-secondary" data-nav="screen-dashboard" style="margin-top:12px">Back to Dashboard</button>
+    </section>
+
+    <!-- Coverage -->
+    <section id="screen-coverage" class="screen">
+      <h2 class="screen-title">Coverage Dashboard</h2>
+      <p class="screen-subtitle" id="coverage-title"></p>
+
+      <div id="coverage-readiness" class="readiness-banner incomplete"></div>
+      <p id="coverage-message" style="margin-bottom:12px;font-size:0.875rem"></p>
+      <div class="progress-bar"><div id="coverage-progress-fill" class="progress-fill" style="width:0%"></div></div>
+
+      <div class="coverage-stats" id="coverage-stats"></div>
+      <div id="coverage-missing"></div>
+
+      <div class="card">
+        <div class="card-header">Accepted Images</div>
+        <div id="image-grid" class="image-grid"></div>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" data-nav="capture">Capture Required Shot</button>
+        <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+      </div>
+    </section>
+
+    <!-- Final QA (Simple Field Method Pass 3) -->
+    <section id="screen-final-qa" class="screen">
+      <h2 class="screen-title">Pass 3: Final QA Fill</h2>
+      <p class="screen-subtitle" id="qa-instruction"></p>
+
+      <div id="qa-readiness" class="readiness-banner incomplete"></div>
+
+      <div class="card">
+        <div class="card-header">Package Status</div>
+        <p>Usable images: <strong id="qa-usable-count">0</strong></p>
+        <p>Target range: <strong id="qa-target-range">25–45</strong></p>
+      </div>
+
+      <div id="qa-missing-views"></div>
+      <div id="qa-retakes"></div>
+      <div id="qa-duplicates"></div>
+      <div id="qa-weak-images"></div>
+
+      <div class="card">
+        <div class="card-header">Final QA Checklist</div>
+        <div id="qa-checklist" class="aerial-options"></div>
+      </div>
+
+      <div class="btn-group">
+        <button type="button" id="btn-complete-qa" class="btn btn-success">Complete Final QA</button>
+        <button type="button" class="btn btn-primary" data-nav="capture">Capture Missing Required View</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-add-context">Add Justified Context View</button>
+        <button type="button" class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+      </div>
+    </section>
+
+    <!-- Final Review -->
+    <section id="screen-final" class="screen">
+      <h2 class="screen-title">Final QCM Summary</h2>
+      <p class="screen-subtitle">Review package readiness before export.</p>
+
+      <div id="final-readiness" class="readiness-banner incomplete"></div>
+      <div id="final-warning"></div>
+      <div id="final-summary"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-success" data-nav="export">Export Project Packet</button>
+        <button class="btn btn-primary" data-nav="capture">Continue Capture</button>
+        <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+      </div>
+    </section>
+
+    <!-- Export -->
+    <section id="screen-export" class="screen">
+      <h2 class="screen-title">Export Project Packet</h2>
+      <p class="screen-subtitle">Download UECS / XPD / ClientFlow-ready project files.</p>
+
+      <div class="card">
+        <div class="card-header">Project: <span id="export-project-id">—</span></div>
+        <div class="export-item"><span>project_packet.json</span><span class="badge badge-muted">JSON</span></div>
+        <div class="export-item"><span>image_manifest.json</span><span class="badge badge-muted">JSON</span></div>
+        <div class="export-item"><span>qcm_summary.json</span><span class="badge badge-muted">JSON</span></div>
+        <div class="export-item"><span>field_capture_report.html</span><span class="badge badge-muted">HTML</span></div>
+      </div>
+
+      <div id="export-status"></div>
+
+      <div class="btn-group">
+        <button id="btn-export" class="btn btn-primary">Export Project Packet</button>
+        <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p class="footer-disclaimer" id="footer-disclaimer"></p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+  <script>
+    document.getElementById('footer-disclaimer').textContent =
+      'This system supports visual and spatial documentation quality control only. QCM results evaluate image clarity, coverage, metadata, and documentation readiness. QCM does not provide engineering opinions, inspection conclusions, code compliance determinations, damage diagnosis, or repair recommendations. Phase 1 stores field capture data locally on your device until export — no images or project records are uploaded to a server.';
+  </script>
+</body>
+</html>
