@@ -419,7 +419,7 @@ export function computeSimpleFieldReadiness(project, images, sfm) {
   };
 }
 
-export { applyImageClassification, classifyImageFromView, CONTEXT_VIEW_OPTIONS, COVERAGE_GROUPS, buildGroundCaptureExport };
+export { applyImageClassification, classifyImageFromView, CONTEXT_VIEW_OPTIONS, COVERAGE_GROUPS, buildGroundCaptureExport, GROUND_QA_REMINDER };
 
 export function buildCapturePassesExport(sfm, images) {
   const pass1Complete = getPass1Progress(sfm, images);

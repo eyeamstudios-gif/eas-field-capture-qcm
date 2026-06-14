@@ -91,15 +91,26 @@ const state = {
 };
 
 async function init() {
-  await initStorage();
-  registerServiceWorker();
-  updateOnlineStatus();
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
+  try {
+    await initStorage();
+    registerServiceWorker();
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
 
-  bindEvents();
-  populatePathwaySelect();
-  await loadHomeScreen();
+    bindEvents();
+    populatePathwaySelect();
+    await loadHomeScreen();
+  } catch (err) {
+    console.error('App init failed:', err);
+    const home = document.getElementById('screen-home');
+    if (home) {
+      const alert = document.createElement('div');
+      alert.className = 'alert alert-warning';
+      alert.textContent = `App failed to start: ${err.message}. Try a hard refresh (clear cache).`;
+      home.prepend(alert);
+    }
+  }
 }
 
 function registerServiceWorker() {
