@@ -36,6 +36,14 @@
       </div>
 
       <div class="card" style="margin-top:24px">
+        <div class="card-header">Project Auto-Load</div>
+        <p class="screen-subtitle">Import a UECS Lite project packet to auto-fill client and site details before capture.</p>
+        <input type="file" id="project-import-file" class="hidden" accept="application/json,.json">
+        <button id="btn-import-project" class="btn btn-secondary">Import Project Info</button>
+        <div id="project-import-status" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card" style="margin-top:24px">
         <div class="card-header">Recent Projects</div>
         <div id="project-list"></div>
       </div>
@@ -45,6 +53,7 @@
     <section id="screen-intake" class="screen">
       <h2 class="screen-title">Project Intake</h2>
       <p class="screen-subtitle">Enter project details before field capture.</p>
+      <div id="intake-autofill-status"></div>
 
       <form id="intake-form">
         <div class="card">
@@ -449,8 +458,15 @@
 
       <div id="export-status"></div>
 
+      <div class="card">
+        <div class="card-header">UECS Lite Delivery</div>
+        <p class="screen-subtitle">Queue the field packet on this device for UECS Lite sync. The queued packet uses the same JSON payload as export.</p>
+        <div id="uecs-queue-status"></div>
+      </div>
+
       <div class="btn-group">
         <button id="btn-export" class="btn btn-primary">Export Project Packet</button>
+        <button id="btn-send-uecs-lite" class="btn btn-success">Send to UECS Lite</button>
         <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
     </section>

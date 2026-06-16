@@ -3,7 +3,7 @@
  */
 
 const DB_NAME = 'field_capture_qcm';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const ACTIVE_PROJECT_KEY = 'fcq_active_project_id';
 
 let db = null;
@@ -38,6 +38,11 @@ function openDB() {
       }
       if (!database.objectStoreNames.contains('image_blobs')) {
         database.createObjectStore('image_blobs', { keyPath: 'image_id' });
+      }
+      if (!database.objectStoreNames.contains('uecs_lite_queue')) {
+        const queueStore = database.createObjectStore('uecs_lite_queue', { keyPath: 'queue_id' });
+        queueStore.createIndex('project_id', 'project_id', { unique: false });
+        queueStore.createIndex('status', 'status', { unique: false });
       }
     };
   });
@@ -139,6 +144,20 @@ export async function getShotListStatus(projectId) {
 export async function saveExportRecord(record) {
   const transaction = await tx('exports', 'readwrite');
   await promisifyRequest(transaction.objectStore('exports').put(record));
+}
+
+export async function saveUecsLiteQueueRecord(record) {
+  const transaction = await tx('uecs_lite_queue', 'readwrite');
+  await promisifyRequest(transaction.objectStore('uecs_lite_queue').put(record));
+}
+
+export async function getUecsLiteQueueRecords(projectId = null) {
+  const transaction = await tx('uecs_lite_queue');
+  const store = transaction.objectStore('uecs_lite_queue');
+  if (projectId) {
+    return promisifyRequest(store.index('project_id').getAll(projectId));
+  }
+  return promisifyRequest(store.getAll());
 }
 
 export function setActiveProjectId(projectId) {

@@ -39,6 +39,8 @@ import {
   saveShotListStatus,
   getShotListStatus,
   saveExportRecord,
+  saveUecsLiteQueueRecord,
+  getUecsLiteQueueRecords,
   setActiveProjectId,
   getActiveProjectId,
   getImageDataUrl,
@@ -46,7 +48,7 @@ import {
 
 import { runQcmAnalysis, computeCoverageSummary, computeProjectQcmSummary } from './qcm.js';
 import { CameraCapture, createFileInputCapture } from './camera.js';
-import { exportProject } from './export.js';
+import { buildProjectPacket, exportProject } from './export.js';
 import {
   usesSimpleFieldMethod,
   initSimpleFieldMethod,
@@ -88,6 +90,7 @@ const state = {
   capturePass: 1,
   selectedViewId: null,
   replacementTargetId: null,
+  importedProjectSource: null,
 };
 
 async function init() {
@@ -136,6 +139,8 @@ function bindEvents() {
     resetIntakeForm();
     showScreen('screen-intake');
   });
+  $('#btn-import-project')?.addEventListener('click', () => $('#project-import-file')?.click());
+  $('#project-import-file')?.addEventListener('change', handleProjectImport);
 
   $('#btn-continue-project')?.addEventListener('click', async () => {
     const activeId = getActiveProjectId();
@@ -175,6 +180,7 @@ function bindEvents() {
   $('#btn-admin-review')?.addEventListener('click', handleAdminReview);
   $('#btn-run-qcm')?.addEventListener('click', handleRunQcm);
   $('#btn-export')?.addEventListener('click', handleExport);
+  $('#btn-send-uecs-lite')?.addEventListener('click', handleSendToUecsLite);
   $('#btn-view-missing')?.addEventListener('click', () => {
     renderShotList(true);
     showScreen('screen-shots');
@@ -239,6 +245,8 @@ function resetIntakeForm() {
   const form = $('#intake-form');
   if (!form) return;
   form.reset();
+  state.importedProjectSource = null;
+  $('#intake-autofill-status').innerHTML = '';
   $('#project-date').value = formatDate();
   $('#doc-control').value = PATHWAY_DOC_CONTROL[SERVICE_PATHWAYS.XPD_BASELINE];
 }
@@ -251,6 +259,117 @@ function onPathwayChange() {
     aerialSection?.classList.remove('hidden');
   } else {
     aerialSection?.classList.add('hidden');
+  }
+}
+
+async function handleProjectImport(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const statusEl = $('#project-import-status');
+  try {
+    const raw = await file.text();
+    const data = JSON.parse(raw);
+    const project = normalizeImportedProject(data);
+
+    resetIntakeForm();
+    populateIntakeForm(project);
+    state.importedProjectSource = {
+      file_name: file.name,
+      imported_at: formatDateTime(),
+      source_system: data.system || data.source_system || 'UECS Lite import',
+      clientflow_request_id: project.clientflow_request_id || null,
+      uecs_project_id: project.uecs_project_id || project.project_id || null,
+    };
+
+    statusEl.innerHTML = `<div class="alert alert-info">Loaded project info from ${escapeHtml(file.name)}. Review details, then create the field capture.</div>`;
+    $('#intake-autofill-status').innerHTML = `<div class="alert alert-info">Project details auto-loaded from ${escapeHtml(file.name)}.</div>`;
+    showScreen('screen-intake');
+  } catch (err) {
+    console.error(err);
+    statusEl.innerHTML = `<div class="alert alert-warning">Import failed: ${escapeHtml(err.message)}</div>`;
+  } finally {
+    e.target.value = '';
+  }
+}
+
+function normalizeImportedProject(data) {
+  const source = data.project || data.project_info || data;
+  if (!source || typeof source !== 'object') {
+    throw new Error('Project import must be a JSON object.');
+  }
+
+  const project = {
+    project_id: source.project_id || data.uecs_project_id || source.uecs_project_id || '',
+    client_name: source.client_name || source.client?.name || '',
+    client_company: source.client_company || source.client?.company || '',
+    client_email: source.client_email || source.client?.email || '',
+    client_phone: source.client_phone || source.client?.phone || '',
+    project_address: source.project_address || source.address || source.site_address || '',
+    city: source.city || source.site_city || '',
+    state: source.state || source.site_state || '',
+    zip: source.zip || source.postal_code || source.site_zip || '',
+    service_pathway: source.service_pathway || data.service_pathway || SERVICE_PATHWAYS.XPD_BASELINE,
+    documentation_level: source.documentation_level || data.documentation_level || '',
+    documentation_control_classification:
+      source.documentation_control_classification ||
+      data.documentation_control_classification ||
+      'UECS-Lite',
+    field_user: source.field_user || '',
+    date: source.date || formatDate(),
+    weather: source.weather || '',
+    site_access_notes: source.site_access_notes || source.access_notes || '',
+    purpose: source.purpose || source.documentation_purpose || '',
+    client_notes: source.client_notes || '',
+    internal_notes: source.internal_notes || '',
+    aerial_status: source.aerial_status || null,
+    clientflow_request_id: source.clientflow_request_id || data.clientflow_request_id || null,
+    uecs_project_id: source.uecs_project_id || data.uecs_project_id || source.project_id || '',
+  };
+
+  if (!project.client_name || !project.project_address) {
+    throw new Error('Project import needs at least client_name and project_address.');
+  }
+
+  return project;
+}
+
+function populateIntakeForm(project) {
+  const setValue = (selector, value) => {
+    const el = $(selector);
+    if (el) el.value = value ?? '';
+  };
+
+  setValue('#project-id', project.project_id);
+  setValue('#client-name', project.client_name);
+  setValue('#client-company', project.client_company);
+  setValue('#client-email', project.client_email);
+  setValue('#client-phone', project.client_phone);
+  setValue('#project-address', project.project_address);
+  setValue('#city', project.city);
+  setValue('#state', project.state);
+  setValue('#zip', project.zip);
+  const pathwaySelect = $('#pathway-select');
+  if (pathwaySelect) {
+    const hasPathway = Array.from(pathwaySelect.options).some((o) => o.value === project.service_pathway);
+    pathwaySelect.value = hasPathway ? project.service_pathway : SERVICE_PATHWAYS.XPD_BASELINE;
+  }
+  setValue('#doc-level', project.documentation_level);
+  setValue('#doc-control', project.documentation_control_classification || 'UECS-Lite');
+  setValue('#field-user', project.field_user);
+  setValue('#project-date', project.date || formatDate());
+  setValue('#weather', project.weather);
+  setValue('#site-access', project.site_access_notes);
+  setValue('#purpose', project.purpose);
+  setValue('#client-notes', project.client_notes);
+  setValue('#internal-notes', project.internal_notes);
+
+  onPathwayChange();
+  setValue('#doc-level', project.documentation_level);
+  setValue('#doc-control', project.documentation_control_classification || 'UECS-Lite');
+  if (project.aerial_status) {
+    const aerial = $$('input[name="aerial_status"]').find((el) => el.value === project.aerial_status);
+    if (aerial) aerial.checked = true;
   }
 }
 
@@ -281,11 +400,13 @@ async function handleIntakeSubmit(e) {
     aerial_status: AERIAL_PATHWAYS.includes(pathway) ? $('input[name="aerial_status"]:checked')?.value : null,
     created_at: formatDateTime(),
     updated_at: formatDateTime(),
-    clientflow_request_id: null,
-    uecs_project_id: null,
+    clientflow_request_id: state.importedProjectSource?.clientflow_request_id || null,
+    uecs_project_id: state.importedProjectSource?.uecs_project_id || null,
+    import_source: state.importedProjectSource,
+    uecs_delivery_status: 'not_queued',
   };
 
-  project.uecs_project_id = project.project_id;
+  project.uecs_project_id = project.uecs_project_id || project.project_id;
 
   state.project = project;
   state.shotList = generateShotList(pathway);
@@ -1144,7 +1265,27 @@ function renderFinalReview() {
 
 function renderExportScreen() {
   $('#export-project-id').textContent = state.project?.project_id || '—';
+  renderUecsQueueStatus();
   showScreen('screen-export');
+}
+
+async function renderUecsQueueStatus() {
+  const el = $('#uecs-queue-status');
+  if (!el || !state.project) return;
+
+  const records = await getUecsLiteQueueRecords(state.project.project_id);
+  if (!records.length) {
+    el.innerHTML = '<div class="alert alert-info">Not queued yet. Send when the packet is ready for UECS Lite intake.</div>';
+    return;
+  }
+
+  records.sort((a, b) => new Date(b.queued_at) - new Date(a.queued_at));
+  const latest = records[0];
+  el.innerHTML = `
+    <div class="alert alert-info">
+      UECS Lite packet queued: ${escapeHtml(latest.queued_at)}<br>
+      Status: ${escapeHtml(latest.status)} · Queue ID: ${escapeHtml(latest.queue_id)}
+    </div>`;
 }
 
 async function handleExport() {
@@ -1171,6 +1312,44 @@ async function handleExport() {
   } catch (err) {
     console.error(err);
     $('#export-status').innerHTML = `<div class="alert alert-warning">Export failed: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function handleSendToUecsLite() {
+  if (!state.project) return;
+  state.shotList = updateZoneStatus(state.shotList, state.images);
+  if (state.sfm) state.sfm = updateSimpleFieldProgress(state.sfm, state.images);
+
+  try {
+    const coverage = getCoverage();
+    const packet = buildProjectPacket(state.project, state.images, state.shotList, coverage, state.sfm);
+    const record = {
+      queue_id: generateId('uecsq'),
+      project_id: state.project.project_id,
+      uecs_project_id: state.project.uecs_project_id || state.project.project_id,
+      status: 'queued',
+      queued_at: formatDateTime(),
+      sync_attempts: 0,
+      sync_endpoint: null,
+      next_action: 'connect_uecs_lite_sync_endpoint',
+      readiness: coverage.readiness,
+      accepted_images: coverage.accepted,
+      payload_type: 'field_capture_project_packet',
+      payload_version: 1,
+      packet,
+    };
+
+    await saveUecsLiteQueueRecord(record);
+    state.project.uecs_delivery_status = 'queued';
+    state.project.uecs_queued_at = record.queued_at;
+    state.project.updated_at = formatDateTime();
+    await saveProject(state.project);
+
+    $('#export-status').innerHTML = `<div class="alert alert-info">UECS Lite packet queued locally. It will remain on this device until the UECS Lite sync endpoint is connected.</div>`;
+    await renderUecsQueueStatus();
+  } catch (err) {
+    console.error(err);
+    $('#export-status').innerHTML = `<div class="alert alert-warning">UECS Lite queue failed: ${escapeHtml(err.message)}</div>`;
   }
 }
 
