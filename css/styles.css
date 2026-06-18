@@ -31,6 +31,9 @@
   --font-body: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --dock-h: 72px;
   --header-h: 60px;
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.35);
@@ -109,6 +112,10 @@ body {
   line-height: 1.55;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
 }
 
 .app-backdrop {
@@ -195,8 +202,10 @@ body {
 .theme-toggle {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -274,6 +283,8 @@ body {
   padding: 20px 16px calc(88px + var(--safe-bottom));
   max-width: 720px;
   margin: 0 auto;
+  scroll-padding-top: calc(var(--header-h) + var(--safe-top));
+  scroll-padding-bottom: calc(var(--dock-h) + var(--safe-bottom) + 16px);
 }
 
 .app-footer {
@@ -295,6 +306,98 @@ body {
   line-height: 1.45;
   max-width: 720px;
   margin: 0 auto;
+  transition: max-height 0.25s ease, opacity 0.25s ease, margin 0.25s ease;
+}
+
+.footer-disclaimer.collapsed {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+.footer-toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin-bottom: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.footer-toggle svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.2s ease;
+}
+
+.footer-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* Fixed mobile project dock */
+.mobile-project-dock {
+  position: fixed;
+  left: max(12px, var(--safe-left));
+  right: max(12px, var(--safe-right));
+  bottom: calc(8px + var(--safe-bottom));
+  z-index: 180;
+  margin: 0;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  background: rgba(14, 18, 26, 0.94);
+}
+
+[data-theme="light"] .mobile-project-dock {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+body.has-project-dock .app-main {
+  padding-bottom: calc(var(--dock-h) + 24px + var(--safe-bottom));
+}
+
+body.has-project-dock .app-footer {
+  display: none;
+}
+
+body.on-capture-screen .app-header {
+  position: relative;
+}
+
+.capture-primary.capture-trigger {
+  width: auto;
+}
+
+.capture-fallback {
+  width: auto;
+  min-height: 44px;
+}
+
+.camera-controls.capture-live-active .capture-fallback {
+  font-size: 0.82rem;
+}
+
+.camera-controls.capture-file-only .capture-fallback {
+  width: 100%;
+  min-height: auto;
+  flex-direction: column;
+  gap: 10px;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none;
+  padding: 0;
 }
 
 /* ── Screens ── */
@@ -405,6 +508,74 @@ body {
   flex-direction: column;
   gap: 10px;
   margin-bottom: 20px;
+}
+
+.home-active-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.home-active-section #btn-continue-project {
+  margin-bottom: 0;
+}
+
+.home-start-section {
+  margin-top: 4px;
+  margin-bottom: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.home-start-section .btn-outline {
+  background: transparent;
+  color: var(--accent-gold);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: none;
+}
+
+.card-notice {
+  background: var(--bg-inset);
+  border-color: rgba(96, 165, 250, 0.2);
+  margin-bottom: 14px;
+}
+
+.notice-text {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.notice-points {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notice-points li {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding-left: 18px;
+  position: relative;
+  line-height: 1.45;
+}
+
+.notice-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--review-blue);
+}
+
+[data-theme="light"] .card-notice {
+  border-color: rgba(37, 99, 235, 0.18);
 }
 
 /* ── Cards ── */
@@ -1787,6 +1958,186 @@ select.form-control {
 }
 
 .hidden { display: none !important; }
+
+/* ── Mobile-first field optimizations ── */
+@media (max-width: 479px) {
+  html { font-size: 16px; }
+
+  .app-header .subtitle { display: none; }
+
+  .app-header h1 { font-size: 0.82rem; }
+
+  .status-pill .status-label { display: none; }
+
+  .status-pill {
+    padding: 8px;
+    min-width: 32px;
+    justify-content: center;
+  }
+
+  .screen-title { font-size: 1.45rem; }
+
+  .hero-panel { padding: 22px 18px; }
+
+  .hero-title { font-size: 1.55rem; }
+
+  .hero-metrics {
+    flex-wrap: wrap;
+    gap: 12px 20px;
+  }
+
+  .form-row,
+  .form-row.three {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-hero-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .readiness-ring-wrap {
+    align-self: center;
+  }
+
+  .kpi-grid,
+  .coverage-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .stat-box .value { font-size: 1.35rem; }
+
+  .pass-stepper {
+    padding: 10px 8px;
+  }
+
+  .step-title { font-size: 0.62rem; }
+
+  .btn-group.row {
+    flex-direction: column;
+  }
+
+  .btn-row-secondary {
+    flex-direction: column;
+  }
+
+  .dock-nav-inline { display: none !important; }
+
+  .screen-capture.active .capture-intro {
+    margin-bottom: 12px;
+  }
+
+  .screen-capture.active .camera-container {
+    aspect-ratio: 3 / 4;
+    max-height: min(58dvh, 520px);
+    margin-left: -16px;
+    margin-right: -16px;
+    width: calc(100% + 32px);
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .screen-capture.active .capture-trigger-inner {
+    width: 80px;
+    height: 80px;
+  }
+
+  .screen-capture.active .camera-controls {
+    position: sticky;
+    bottom: calc(var(--dock-h) + 8px + var(--safe-bottom));
+    z-index: 10;
+    background: linear-gradient(to top, var(--bg-deep) 70%, transparent);
+    margin: 0 -4px;
+    padding: 12px 4px 8px;
+  }
+
+  body.on-capture-screen.has-project-dock .screen-capture.active .camera-controls {
+    bottom: calc(var(--dock-h) + 12px + var(--safe-bottom));
+  }
+
+  .qcm-score-hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .qa-stats {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .footer-toggle { display: flex; }
+
+  .toast-stack {
+    bottom: calc(72px + var(--safe-bottom));
+    width: calc(100% - 24px);
+  }
+
+  body.has-project-dock .toast-stack {
+    bottom: calc(var(--dock-h) + 16px + var(--safe-bottom));
+  }
+}
+
+@media (max-width: 719px) {
+  .dock-nav-inline { display: none !important; }
+
+  body.has-project-dock #mobile-project-dock:not(.hidden) {
+    display: flex;
+  }
+
+  .mobile-project-dock .nav-tab {
+    min-height: 52px;
+    padding: 10px 6px;
+  }
+
+  .mobile-project-dock .nav-tab span {
+    font-size: 0.6rem;
+  }
+}
+
+@media (min-width: 720px) {
+  .mobile-project-dock { display: none !important; }
+
+  .dock-nav-inline { display: flex; }
+
+  body.has-project-dock .app-main {
+    padding-bottom: calc(88px + var(--safe-bottom));
+  }
+
+  body.has-project-dock .app-footer {
+    display: block;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .btn:hover,
+  .project-item:hover,
+  .shot-item:hover,
+  .nav-tab:hover,
+  .image-thumb:hover {
+    transform: none;
+  }
+
+  .project-item:active,
+  .shot-item:active,
+  .nav-tab:active {
+    transform: scale(0.98);
+    opacity: 0.92;
+  }
+
+  .capture-trigger-inner {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (display-mode: standalone) {
+  .app-header {
+    padding-top: calc(12px + var(--safe-top));
+  }
+}
 
 /* ── Responsive ── */
 @media (min-width: 480px) {

@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#06080c">
   <meta name="description" content="EAS Field Capture QCM — Executive-grade field documentation quality control for XPD and EAS service pathways">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Field QCM">
+  <meta name="format-detection" content="telephone=no">
   <title>Field Capture QCM — EAS | UECS</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
@@ -78,15 +81,45 @@
         </div>
       </div>
 
-      <div class="action-stack">
-        <button id="btn-start-project" class="btn btn-primary btn-hero">
-          <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Start Field Capture
-        </button>
-        <button id="btn-continue-project" class="btn btn-secondary hidden">
+      <div id="home-active-section" class="home-active-section">
+        <button id="btn-continue-project" class="btn btn-primary btn-hero hidden">
           <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M6 4l8 6-8 6V4z" fill="currentColor"/></svg>
           Continue Active Project
         </button>
+
+        <div class="card" id="home-recent-projects">
+          <div class="card-header-row">
+            <div class="card-header">Recent Projects</div>
+            <span id="project-count-badge" class="card-tag hidden">0</span>
+          </div>
+          <div class="project-toolbar">
+            <div class="search-field">
+              <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <input type="search" id="project-search" class="form-control search-input" placeholder="Search by project, client, or pathway…" autocomplete="off">
+            </div>
+            <select id="project-filter" class="form-control filter-select" aria-label="Filter projects">
+              <option value="all">All projects</option>
+              <option value="active">Active project</option>
+              <option value="xpd">XPD pathways</option>
+              <option value="eas">EAS pathways</option>
+            </select>
+          </div>
+          <div id="project-list" class="project-list"></div>
+          <p id="project-list-empty" class="card-lead hidden">No projects match your search.</p>
+        </div>
+      </div>
+
+      <div class="card card-notice" id="home-field-notice">
+        <div class="card-header-row">
+          <div class="card-header">Before You Capture</div>
+          <span class="card-tag">QCM Scope</span>
+        </div>
+        <p id="home-notice-text" class="notice-text"></p>
+        <ul class="notice-points">
+          <li>QCM checks image clarity, coverage, metadata, and package readiness</li>
+          <li>Does not provide engineering opinions, inspections, or repair recommendations</li>
+          <li>Phase 1 stores data locally on your device until export</li>
+        </ul>
       </div>
 
       <div class="card card-elevated">
@@ -103,25 +136,11 @@
         <div id="project-import-status" class="card-footer-slot"></div>
       </div>
 
-      <div class="card">
-        <div class="card-header-row">
-          <div class="card-header">Recent Projects</div>
-          <span id="project-count-badge" class="card-tag hidden">0</span>
-        </div>
-        <div class="project-toolbar">
-          <div class="search-field">
-            <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <input type="search" id="project-search" class="form-control search-input" placeholder="Search by project, client, or pathway…" autocomplete="off">
-          </div>
-          <select id="project-filter" class="form-control filter-select" aria-label="Filter projects">
-            <option value="all">All projects</option>
-            <option value="active">Active project</option>
-            <option value="xpd">XPD pathways</option>
-            <option value="eas">EAS pathways</option>
-          </select>
-        </div>
-        <div id="project-list" class="project-list"></div>
-        <p id="project-list-empty" class="card-lead hidden">No projects match your search.</p>
+      <div class="action-stack home-start-section">
+        <button id="btn-start-project" class="btn btn-primary btn-hero">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Start Field Capture
+        </button>
       </div>
     </section>
 
@@ -155,7 +174,7 @@
             </div>
             <div class="form-group">
               <label for="client-phone">Client Phone</label>
-              <input type="tel" id="client-phone" class="form-control">
+              <input type="tel" id="client-phone" class="form-control" inputmode="tel" autocomplete="tel">
             </div>
           </div>
         </div>
@@ -173,11 +192,11 @@
             </div>
             <div class="form-group">
               <label for="state">State</label>
-              <input type="text" id="state" class="form-control" maxlength="2" placeholder="TX">
+              <input type="text" id="state" class="form-control" maxlength="2" placeholder="TX" inputmode="text" autocapitalize="characters">
             </div>
             <div class="form-group">
               <label for="zip">ZIP</label>
-              <input type="text" id="zip" class="form-control">
+              <input type="text" id="zip" class="form-control" inputmode="numeric">
             </div>
           </div>
         </div>
@@ -394,7 +413,7 @@
         </div>
       </div>
 
-      <nav class="bottom-nav dock-nav" aria-label="Project navigation">
+      <nav class="bottom-nav dock-nav dock-nav-inline" aria-label="Project navigation">
         <button class="nav-tab active" data-nav="screen-dashboard">
           <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
           <span>Dashboard</span>
@@ -423,8 +442,8 @@
     </section>
 
     <!-- Capture -->
-    <section id="screen-capture" class="screen">
-      <div class="screen-intro">
+    <section id="screen-capture" class="screen screen-capture">
+      <div class="screen-intro capture-intro">
         <h2 class="screen-title">Capture</h2>
         <p class="screen-subtitle">Document the site with guided QCM validation.</p>
       </div>
@@ -448,12 +467,15 @@
         </div>
       </div>
 
-      <div class="camera-controls">
-        <button id="btn-capture-file" class="btn btn-primary capture-trigger">
+      <div class="camera-controls" id="camera-controls">
+        <button type="button" id="btn-capture-live" class="btn capture-trigger capture-primary hidden" aria-label="Take photo with camera">
           <span class="capture-trigger-inner"></span>
-          <span class="capture-trigger-label">Capture Photo</span>
+          <span class="capture-trigger-label">Take Photo</span>
         </button>
-        <button id="btn-capture-live" class="btn btn-secondary btn-sm hidden">Live Capture</button>
+        <button type="button" id="btn-capture-file" class="btn btn-secondary capture-fallback" aria-label="Choose photo from library">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="5" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="11" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+          Photo Library
+        </button>
       </div>
 
       <div id="capture-meta-section" class="card hidden">
@@ -651,8 +673,31 @@
     </section>
   </main>
 
+  <nav id="mobile-project-dock" class="bottom-nav dock-nav mobile-project-dock hidden" aria-label="Project navigation">
+    <button class="nav-tab" data-nav="screen-dashboard">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-tab" id="mobile-shots-nav" data-nav="shots">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Shots</span>
+    </button>
+    <button class="nav-tab nav-tab-capture" data-nav="capture">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      <span>Capture</span>
+    </button>
+    <button class="nav-tab" data-nav="coverage">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 20l7-7 4 4 7-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Coverage</span>
+    </button>
+  </nav>
+
   <footer class="app-footer">
-    <p class="footer-disclaimer" id="footer-disclaimer"></p>
+    <button type="button" id="btn-footer-toggle" class="footer-toggle" aria-expanded="false" aria-controls="footer-disclaimer">
+      <span>Field capture disclaimer</span>
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <p class="footer-disclaimer collapsed" id="footer-disclaimer"></p>
   </footer>
 
   <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>

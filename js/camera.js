@@ -19,19 +19,23 @@ export class CameraCapture {
     }
 
     try {
+      const isMobile = window.matchMedia('(max-width: 719px), (hover: none) and (pointer: coarse)').matches;
       const constraints = {
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          width: { ideal: isMobile ? 1280 : 1920 },
+          height: { ideal: isMobile ? 720 : 1080 },
         },
         audio: false,
       };
 
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
       if (this.videoEl) {
+        this.videoEl.setAttribute('playsinline', '');
+        this.videoEl.setAttribute('webkit-playsinline', '');
         this.videoEl.srcObject = this.stream;
         await this.videoEl.play();
+        this.videoEl.classList.remove('hidden');
       }
       this.mode = 'live';
       return { supported: true };
@@ -152,6 +156,7 @@ export function createFileInputCapture(onCapture) {
   input.type = 'file';
   input.accept = 'image/*';
   input.capture = 'environment';
+  input.setAttribute('capture', 'environment');
   input.style.display = 'none';
   document.body.appendChild(input);
 

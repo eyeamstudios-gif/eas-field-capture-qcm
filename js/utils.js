@@ -174,7 +174,33 @@ const NAV_TAB_MAP = {
   'screen-coverage': 'coverage',
 };
 
+const PROJECT_DOCK_SCREENS = new Set([
+  'screen-dashboard',
+  'screen-shots',
+  'screen-capture',
+  'screen-coverage',
+  'screen-final-qa',
+  'screen-final',
+  'screen-export',
+]);
+
+let activeScreenId = 'screen-home';
+
+export function isMobileDevice() {
+  return (
+    window.matchMedia('(max-width: 719px)').matches ||
+    window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  );
+}
+
+export function getActiveScreenId() {
+  return activeScreenId;
+}
+
 export function showScreen(screenId) {
+  const previousScreen = activeScreenId;
+  activeScreenId = screenId;
+
   $$('.screen').forEach((s) => s.classList.remove('active'));
   const screen = $(`#${screenId}`);
   if (screen) screen.classList.add('active');
@@ -186,6 +212,23 @@ export function showScreen(screenId) {
   $$('.nav-tab').forEach((tab) => {
     tab.classList.toggle('active', navTarget != null && tab.dataset.nav === navTarget);
   });
+
+  const hasDock = PROJECT_DOCK_SCREENS.has(screenId);
+  document.body.classList.toggle('has-project-dock', hasDock);
+  document.body.classList.toggle('on-capture-screen', screenId === 'screen-capture');
+  document.body.dataset.screen = screenId.replace('screen-', '');
+
+  const mobileDock = $('#mobile-project-dock');
+  if (mobileDock) {
+    const showMobileDock = hasDock && isMobileDevice();
+    mobileDock.classList.toggle('hidden', !showMobileDock);
+  }
+
+  window.dispatchEvent(
+    new CustomEvent('eas:screen-change', {
+      detail: { screenId, previousScreen },
+    })
+  );
 
   window.scrollTo(0, 0);
 }

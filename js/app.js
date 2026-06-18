@@ -19,6 +19,8 @@ import {
   toggleTheme,
   animateQcmScore,
   updateQcmScoreRing,
+  isMobileDevice,
+  getActiveScreenId,
   debounce,
   escapeHtml,
   badgeClass,
@@ -112,6 +114,8 @@ async function init() {
 
     bindEvents();
     populatePathwaySelect();
+    setupMobileOptimizations();
+    populateHomeNotice();
     await loadHomeScreen();
   } catch (err) {
     console.error('App init failed:', err);
@@ -143,6 +147,39 @@ function updateOnlineStatus() {
     if (label) label.textContent = 'Offline';
     else el.textContent = 'Offline';
     el.classList.remove('online');
+  }
+}
+
+function setupMobileOptimizations() {
+  window.addEventListener('eas:screen-change', (e) => {
+    const { screenId, previousScreen } = e.detail || {};
+    if (previousScreen === 'screen-capture' && screenId !== 'screen-capture') {
+      state.camera?.stop();
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && getActiveScreenId() === 'screen-capture') {
+      state.camera?.stop();
+    }
+  });
+
+  $('#btn-footer-toggle')?.addEventListener('click', () => {
+    const btn = $('#btn-footer-toggle');
+    const disclaimer = $('#footer-disclaimer');
+    if (!btn || !disclaimer) return;
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    disclaimer.classList.toggle('collapsed', expanded);
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      document.documentElement.style.setProperty(
+        '--viewport-offset',
+        `${Math.max(0, window.innerHeight - window.visualViewport.height)}px`
+      );
+    });
   }
 }
 
@@ -462,6 +499,27 @@ async function handlePathwaySave() {
   showScreen('screen-dashboard');
 }
 
+function populateHomeNotice() {
+  const el = $('#home-notice-text');
+  if (el) el.textContent = DISCLAIMER;
+}
+
+function updateHomeCTA() {
+  const activeId = getActiveProjectId();
+  const hasActive = activeId && state.homeProjects.some((p) => p.project_id === activeId);
+  const hasProjects = state.homeProjects.length > 0;
+
+  $('#btn-continue-project')?.classList.toggle('hidden', !hasActive);
+
+  const startBtn = $('#btn-start-project');
+  if (startBtn) {
+    const isSecondary = hasActive || hasProjects;
+    startBtn.classList.toggle('btn-primary', !isSecondary);
+    startBtn.classList.toggle('btn-hero', !isSecondary);
+    startBtn.classList.toggle('btn-outline', isSecondary);
+  }
+}
+
 async function loadHomeScreen() {
   const projects = await getAllProjects();
   state.homeProjects = projects.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
@@ -472,13 +530,7 @@ async function loadHomeScreen() {
   if (filterEl) filterEl.value = 'all';
 
   renderProjectList(state.homeProjects);
-
-  const activeId = getActiveProjectId();
-  if (activeId && state.homeProjects.some((p) => p.project_id === activeId)) {
-    $('#btn-continue-project')?.classList.remove('hidden');
-  } else {
-    $('#btn-continue-project')?.classList.add('hidden');
-  }
+  updateHomeCTA();
 }
 
 function filterProjectList() {
@@ -567,6 +619,8 @@ function renderProjectList(projects, isFiltered = false) {
       showScreen('screen-dashboard');
     });
   });
+
+  updateHomeCTA();
 }
 
 async function loadProject(projectId) {
@@ -615,12 +669,14 @@ function renderSimpleFieldPanel(coverage) {
   if (!isSfm() || !state.sfm) {
     panel.classList.add('hidden');
     legacyShots?.classList.remove('hidden');
+    $('#mobile-shots-nav')?.classList.remove('hidden');
     $('#legacy-dash-actions')?.classList.remove('hidden');
     return;
   }
 
   panel.classList.remove('hidden');
   legacyShots?.classList.remove('hidden');
+  $('#mobile-shots-nav')?.classList.remove('hidden');
   $('#legacy-dash-actions')?.classList.add('hidden');
 
   const p1 = getPass1Progress(state.sfm, state.images);
@@ -1048,25 +1104,53 @@ function openCaptureScreen() {
   showScreen('screen-capture');
 }
 
+function configureCaptureControls(liveSupported) {
+  const controls = $('#camera-controls');
+  const liveBtn = $('#btn-capture-live');
+  const fileBtn = $('#btn-capture-file');
+  if (!controls || !fileBtn) return;
+
+  fileBtn.innerHTML = liveSupported
+    ? `<svg class="btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="5" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="11" r="3" stroke="currentColor" stroke-width="1.5"/></svg> Photo Library`
+    : `<span class="capture-trigger-inner"></span><span class="capture-trigger-label">Capture Photo</span>`;
+
+  if (liveSupported) {
+    controls.classList.add('capture-live-active');
+    controls.classList.remove('capture-file-only');
+    liveBtn?.classList.remove('hidden');
+    fileBtn.className = 'btn btn-ghost capture-fallback';
+  } else {
+    controls.classList.remove('capture-live-active');
+    controls.classList.add('capture-file-only');
+    liveBtn?.classList.add('hidden');
+    fileBtn.className = 'btn btn-primary capture-trigger capture-primary capture-fallback';
+  }
+}
+
 function initCamera() {
   const video = $('#camera-video');
   const canvas = $('#camera-canvas');
   const preview = $('#capture-preview');
+  const placeholder = $('#live-camera-section');
 
+  state.camera?.stop();
   state.camera = new CameraCapture({ videoEl: video, canvasEl: canvas, previewEl: preview });
 
   if (!state.fileCapture) {
     state.fileCapture = createFileInputCapture(handleFileCapture);
   }
 
+  placeholder?.classList.remove('hidden');
+  video?.classList.add('hidden');
+
   state.camera.initLivePreview().then((result) => {
-    const liveBtn = $('#btn-capture-live');
-    const liveSection = $('#live-camera-section');
+    placeholder?.classList.add('hidden');
     if (result.supported) {
-      liveSection?.classList.remove('hidden');
-      liveBtn?.classList.remove('hidden');
+      video?.classList.remove('hidden');
+      configureCaptureControls(true);
     } else {
-      liveSection?.classList.add('hidden');
+      video?.classList.add('hidden');
+      configureCaptureControls(false);
     }
   });
 }
