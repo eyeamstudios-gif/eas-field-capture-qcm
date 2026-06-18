@@ -81,11 +81,142 @@ export function $$(selector, parent = document) {
   return [...parent.querySelectorAll(selector)];
 }
 
+const THEME_STORAGE_KEY = 'eas-fc-theme';
+
+export function initTheme() {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+  setTheme(saved || (prefersLight ? 'light' : 'dark'), false);
+}
+
+export function getTheme() {
+  return document.documentElement.dataset.theme || 'dark';
+}
+
+export function setTheme(theme, persist = true) {
+  const next = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  if (persist) localStorage.setItem(THEME_STORAGE_KEY, next);
+
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = next === 'light' ? '#f0f2f6' : '#06080c';
+
+  const toggle = $('#btn-theme-toggle');
+  if (toggle) {
+    toggle.setAttribute('aria-label', next === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+    toggle.title = next === 'light' ? 'Dark mode' : 'Light mode';
+  }
+}
+
+export function toggleTheme() {
+  setTheme(getTheme() === 'light' ? 'dark' : 'light');
+}
+
+export function animateQcmScore(element, target, durationMs = 900) {
+  if (!element) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const score = Math.max(0, Math.min(100, Math.round(target)));
+    const start = performance.now();
+
+    function tick(now) {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      element.textContent = Math.round(score * eased);
+      if (t < 1) requestAnimationFrame(tick);
+      else {
+        element.textContent = score;
+        resolve();
+      }
+    }
+
+    element.textContent = '0';
+    requestAnimationFrame(tick);
+  });
+}
+
+export function updateQcmScoreRing(score, status) {
+  const ring = $('#qcm-score-ring-progress');
+  if (!ring) return;
+
+  const clamped = Math.max(0, Math.min(100, score));
+  const circumference = 2 * Math.PI * 40;
+  ring.style.strokeDasharray = `${circumference}`;
+  ring.style.strokeDashoffset = `${circumference - (clamped / 100) * circumference}`;
+
+  const colorMap = {
+    PASS: 'var(--pass-green)',
+    'PASS WITH NOTE': 'var(--pass-green)',
+    WARNING: 'var(--warning-amber)',
+    'RETAKE RECOMMENDED': 'var(--fail-red)',
+    FAIL: 'var(--fail-red)',
+    'ADMIN REVIEW': 'var(--review-blue)',
+  };
+  ring.style.stroke = colorMap[status] || 'var(--accent-gold)';
+}
+
+const SCREEN_LABELS = {
+  'screen-home': 'Home',
+  'screen-intake': 'Project Intake',
+  'screen-shots': 'Shot List',
+  'screen-dashboard': 'Dashboard',
+  'screen-capture': 'Capture',
+  'screen-coverage': 'Coverage',
+  'screen-final-qa': 'Final QA',
+  'screen-final': 'Final Review',
+  'screen-export': 'Export',
+};
+
+const NAV_TAB_MAP = {
+  'screen-dashboard': 'screen-dashboard',
+  'screen-shots': 'shots',
+  'screen-capture': 'capture',
+  'screen-coverage': 'coverage',
+};
+
 export function showScreen(screenId) {
   $$('.screen').forEach((s) => s.classList.remove('active'));
   const screen = $(`#${screenId}`);
   if (screen) screen.classList.add('active');
+
+  const crumb = $('#header-breadcrumb');
+  if (crumb) crumb.textContent = SCREEN_LABELS[screenId] || '';
+
+  const navTarget = NAV_TAB_MAP[screenId];
+  $$('.nav-tab').forEach((tab) => {
+    tab.classList.toggle('active', navTarget != null && tab.dataset.nav === navTarget);
+  });
+
   window.scrollTo(0, 0);
+}
+
+export function showToast(message, type = 'info', durationMs = 3000) {
+  const stack = $('#toast-stack');
+  if (!stack) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  stack.appendChild(toast);
+
+  setTimeout(() => toast.remove(), durationMs);
+}
+
+export function updateReadinessRing(percent) {
+  const ring = $('#dash-ring-progress');
+  const label = $('#dash-ring-label');
+  if (!ring) return;
+
+  const clamped = Math.max(0, Math.min(100, percent));
+  const circumference = 2 * Math.PI * 34;
+  ring.style.strokeDasharray = `${circumference}`;
+  ring.style.strokeDashoffset = `${circumference - (clamped / 100) * circumference}`;
+
+  if (label) label.textContent = `${clamped}%`;
+
+  if (clamped >= 100) ring.style.stroke = 'var(--pass-green)';
+  else if (clamped >= 60) ring.style.stroke = 'var(--accent-gold)';
+  else ring.style.stroke = 'var(--review-blue)';
 }
 
 export function escapeHtml(str) {

@@ -13,6 +13,13 @@ import {
   $,
   $$,
   showScreen,
+  showToast,
+  updateReadinessRing,
+  initTheme,
+  toggleTheme,
+  animateQcmScore,
+  updateQcmScoreRing,
+  debounce,
   escapeHtml,
   badgeClass,
   qcmResultClass,
@@ -91,10 +98,12 @@ const state = {
   selectedViewId: null,
   replacementTargetId: null,
   importedProjectSource: null,
+  homeProjects: [],
 };
 
 async function init() {
   try {
+    initTheme();
     await initStorage();
     registerServiceWorker();
     updateOnlineStatus();
@@ -125,16 +134,21 @@ function registerServiceWorker() {
 function updateOnlineStatus() {
   const el = $('#offline-indicator');
   if (!el) return;
+  const label = el.querySelector('.status-label');
   if (navigator.onLine) {
-    el.textContent = 'Online';
+    if (label) label.textContent = 'Online';
+    else el.textContent = 'Online';
     el.classList.add('online');
   } else {
-    el.textContent = 'Offline';
+    if (label) label.textContent = 'Offline';
+    else el.textContent = 'Offline';
     el.classList.remove('online');
   }
 }
 
 function bindEvents() {
+  $('#btn-theme-toggle')?.addEventListener('click', toggleTheme);
+
   $('#btn-start-project')?.addEventListener('click', () => {
     resetIntakeForm();
     showScreen('screen-intake');
@@ -210,6 +224,9 @@ function bindEvents() {
     state.selectedViewId = CONTEXT_VIEW_OPTIONS[0]?.id;
     openCaptureScreen();
   });
+
+  $('#project-search')?.addEventListener('input', debounce(filterProjectList, 200));
+  $('#project-filter')?.addEventListener('change', filterProjectList);
 }
 
 function isSfm() {
@@ -447,26 +464,99 @@ async function handlePathwaySave() {
 
 async function loadHomeScreen() {
   const projects = await getAllProjects();
+  state.homeProjects = projects.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+  const searchEl = $('#project-search');
+  const filterEl = $('#project-filter');
+  if (searchEl) searchEl.value = '';
+  if (filterEl) filterEl.value = 'all';
+
+  renderProjectList(state.homeProjects);
+
+  const activeId = getActiveProjectId();
+  if (activeId && state.homeProjects.some((p) => p.project_id === activeId)) {
+    $('#btn-continue-project')?.classList.remove('hidden');
+  } else {
+    $('#btn-continue-project')?.classList.add('hidden');
+  }
+}
+
+function filterProjectList() {
+  const query = ($('#project-search')?.value || '').trim().toLowerCase();
+  const filter = $('#project-filter')?.value || 'all';
+  const activeId = getActiveProjectId();
+
+  let filtered = [...state.homeProjects];
+
+  if (filter === 'active' && activeId) {
+    filtered = filtered.filter((p) => p.project_id === activeId);
+  } else if (filter === 'xpd') {
+    filtered = filtered.filter((p) => (p.service_pathway || '').startsWith('XPD'));
+  } else if (filter === 'eas') {
+    filtered = filtered.filter((p) => (p.service_pathway || '').startsWith('EAS'));
+  }
+
+  if (query) {
+    filtered = filtered.filter((p) => {
+      const haystack = [
+        p.project_id,
+        p.client_name,
+        p.client_company,
+        p.project_address,
+        p.service_pathway,
+        p.city,
+        p.state,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }
+
+  renderProjectList(filtered, query || filter !== 'all');
+}
+
+function renderProjectList(projects, isFiltered = false) {
   const listEl = $('#project-list');
+  const emptyEl = $('#project-list-empty');
+  const countBadge = $('#project-count-badge');
   if (!listEl) return;
 
-  if (projects.length === 0) {
-    listEl.innerHTML = '<p class="screen-subtitle">No saved projects. Start a new field capture.</p>';
-    $('#btn-continue-project')?.classList.add('hidden');
+  if (!state.homeProjects.length) {
+    listEl.innerHTML = '';
+    emptyEl?.classList.add('hidden');
+    countBadge?.classList.add('hidden');
+    listEl.innerHTML = '<p class="card-lead">No saved projects yet. Start a new field capture to begin.</p>';
     return;
   }
 
-  projects.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  if (countBadge) {
+    countBadge.textContent = `${projects.length}`;
+    countBadge.classList.toggle('hidden', !isFiltered && projects.length === state.homeProjects.length);
+  }
+
+  if (!projects.length) {
+    listEl.innerHTML = '';
+    emptyEl?.classList.remove('hidden');
+    return;
+  }
+
+  emptyEl?.classList.add('hidden');
+
+  const activeId = getActiveProjectId();
   listEl.innerHTML = projects
-    .slice(0, 5)
     .map(
       (p) => `
-    <div class="project-item" data-project-id="${escapeHtml(p.project_id)}">
-      <div>
-        <h4>${escapeHtml(p.project_id)}</h4>
-        <p>${escapeHtml(p.client_name)} — ${escapeHtml(p.service_pathway)}</p>
+    <div class="project-item${p.project_id === activeId ? ' project-item-active' : ''}" data-project-id="${escapeHtml(p.project_id)}">
+      <div class="project-item-main">
+        <h4>${escapeHtml(p.project_id)}${p.project_id === activeId ? ' <span class="badge badge-review" style="font-size:0.58rem;vertical-align:middle">Active</span>' : ''}</h4>
+        <p>${escapeHtml(p.client_name)} · ${escapeHtml(p.service_pathway)}</p>
       </div>
       <span class="badge badge-muted">${escapeHtml(p.date)}</span>
+      <span class="project-item-chevron" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
     </div>`
     )
     .join('');
@@ -477,11 +567,6 @@ async function loadHomeScreen() {
       showScreen('screen-dashboard');
     });
   });
-
-  const activeId = getActiveProjectId();
-  if (activeId && projects.some((p) => p.project_id === activeId)) {
-    $('#btn-continue-project')?.classList.remove('hidden');
-  }
 }
 
 async function loadProject(projectId) {
@@ -516,6 +601,7 @@ function renderDashboard() {
   $('#dash-readiness').className = `readiness-banner ${readinessClass(coverage.readiness)}`;
   $('#dash-progress-fill').style.width = `${coverage.packageReadiness}%`;
   $('#dash-progress-text').textContent = `${coverage.packageReadiness}% — ${coverage.accepted} accepted / ${coverage.targetMin}–${coverage.targetMax} target`;
+  updateReadinessRing(coverage.packageReadiness);
 
   renderMiniStats(coverage);
   renderSimpleFieldPanel(coverage);
@@ -559,12 +645,45 @@ function renderSimpleFieldPanel(coverage) {
   }
 
   const pass1Complete = p1.complete === p1.total;
+  const pass2Complete = p2.complete === p2.total;
+  const pass3Complete = state.sfm.pass3?.completed;
+
   $('#btn-start-pass1')?.classList.toggle('hidden', pass1Complete);
   $('#btn-capture-next-view')?.classList.toggle('hidden', pass1Complete);
   $('#btn-capture-detail')?.classList.toggle('hidden', !pass1Complete);
   $('#btn-run-final-qa')?.classList.toggle('hidden', !(pass1Complete && p2.complete >= Math.min(5, p2.total)));
 
+  renderPassStepper(p1, p2, pass3Complete, p3Status);
   renderGroundCaptureDashboard(coverage);
+}
+
+function renderPassStepper(p1, p2, pass3Complete, pass3Status) {
+  const stepper = $('#pass-stepper');
+  if (!stepper) return;
+
+  const steps = stepper.querySelectorAll('.step');
+  const connectors = stepper.querySelectorAll('.step-connector');
+
+  const pass1Done = p1.complete === p1.total;
+  const pass2Done = p2.complete === p2.total;
+  const pass3Started = state.sfm?.pass3?.started;
+
+  steps[0]?.classList.toggle('complete', pass1Done);
+  steps[0]?.classList.toggle('active', !pass1Done);
+  steps[1]?.classList.toggle('complete', pass2Done);
+  steps[1]?.classList.toggle('active', pass1Done && !pass2Done);
+  steps[2]?.classList.toggle('complete', pass3Complete);
+  steps[2]?.classList.toggle('active', pass2Done && !pass3Complete);
+
+  connectors[0]?.classList.toggle('complete', pass1Done);
+  connectors[1]?.classList.toggle('complete', pass2Done);
+
+  const s1 = $('#stepper-pass1');
+  const s2 = $('#stepper-pass2');
+  const s3 = $('#stepper-pass3');
+  if (s1) s1.textContent = `${p1.complete}/${p1.total}`;
+  if (s2) s2.textContent = `${p2.complete}/${p2.total}`;
+  if (s3) s3.textContent = pass3Complete ? 'Complete' : pass3Started ? 'In progress' : 'Pending';
 }
 
 function renderGroundCaptureDashboard(coverage) {
@@ -825,7 +944,7 @@ async function handleSaveSiteLimitation() {
   $('#site-limitation-panel')?.classList.add('hidden');
   $('#site-limitation-note').value = '';
   renderDashboard();
-  alert('Site limitation noted.');
+  showToast('Site limitation noted.', 'success');
 }
 
 function openFinalQa() {
@@ -1100,18 +1219,38 @@ function renderQcmResult(qcm, zone) {
   const panel = $('#qcm-result-panel');
   if (!panel) return;
 
-  panel.className = `qcm-result ${qcmResultClass(qcm.qcm_status)}`;
+  panel.className = `qcm-result qcm-reveal ${qcmResultClass(qcm.qcm_status)}`;
   panel.innerHTML = `
     <h3>Image QCM Result</h3>
     <p>Status: <span class="badge ${badgeClass(qcm.qcm_status)}">${escapeHtml(qcm.qcm_status)}</span></p>
-    <div class="qcm-score-display">${qcm.qcm_score} / 100</div>
-    <p>Zone: ${escapeHtml(zone?.name || '—')}</p>
-    <p>Shot Type: ${escapeHtml(state.pendingCapture?.imageMeta?.wide_or_closeup || '—')}</p>
-    <h4 style="margin-top:12px;font-size:0.85rem;">Checks:</h4>
+    <div class="qcm-score-hero">
+      <div class="qcm-score-ring-wrap">
+        <svg class="qcm-score-ring" viewBox="0 0 88 88">
+          <circle class="ring-track" cx="44" cy="44" r="40"/>
+          <circle id="qcm-score-ring-progress" class="ring-progress" cx="44" cy="44" r="40"/>
+        </svg>
+        <span id="qcm-score-value" class="qcm-score-value">0</span>
+      </div>
+      <div class="qcm-score-meta">
+        <div class="qcm-score-label">Quality Score</div>
+        <div class="qcm-score-max">out of 100</div>
+        <p style="margin-top:8px;font-size:0.85rem;color:var(--text-secondary)">Zone: ${escapeHtml(zone?.name || '—')}</p>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">Shot: ${escapeHtml(state.pendingCapture?.imageMeta?.wide_or_closeup || '—')}</p>
+      </div>
+    </div>
+    <h4 style="margin-top:12px;font-size:0.85rem;">Checks</h4>
     <ul class="qcm-checks">
       ${qcm.checks.map((c) => `<li><span class="check-icon ${c.status}">${c.status === 'pass' ? '✓' : c.status === 'fail' ? '✗' : '!'}</span> ${escapeHtml(c.name)}: ${escapeHtml(c.message)}</li>`).join('')}
     </ul>
     <div class="qcm-recommendation"><strong>Recommendation:</strong> ${escapeHtml(qcm.recommendation)}</div>`;
+
+  requestAnimationFrame(() => {
+    updateQcmScoreRing(0, qcm.qcm_status);
+    requestAnimationFrame(() => {
+      updateQcmScoreRing(qcm.qcm_score, qcm.qcm_status);
+      animateQcmScore($('#qcm-score-value'), qcm.qcm_score);
+    });
+  });
 }
 
 async function handleAcceptImage() {
@@ -1156,6 +1295,7 @@ async function handleAcceptImage() {
   resetCaptureScreen();
   renderDashboard();
   showScreen('screen-dashboard');
+  showToast('Image accepted and saved.', 'success');
 }
 
 async function handleAdminReview() {
@@ -1195,7 +1335,7 @@ function renderCoverageDashboard() {
     <div class="stat-box"><div class="value">${coverage.targetMin}–${coverage.targetMax}</div><div class="label">Target</div></div>
     <div class="stat-box"><div class="value">${coverage.packageReadiness}%</div><div class="label">Readiness</div></div>`;
 
-  const missing = getMissingZones(shotList);
+  const missing = getMissingZones(state.shotList);
   const missingEl = $('#coverage-missing');
   if (isSfm() && coverage.missingCoreAreas?.length) {
     missingEl.innerHTML = `<div class="alert alert-warning"><strong>Missing Core Coverage:</strong><ul>${coverage.missingCoreAreas.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul></div>`;
@@ -1309,6 +1449,7 @@ async function handleExport() {
     });
 
     $('#export-status').innerHTML = `<div class="alert alert-info">Export complete. ${result.files.length} files downloaded.<br>Status: ${readinessLabel(result.coverage.readiness)}</div>`;
+    showToast(`Export complete — ${result.files.length} files`, 'success');
   } catch (err) {
     console.error(err);
     $('#export-status').innerHTML = `<div class="alert alert-warning">Export failed: ${escapeHtml(err.message)}</div>`;

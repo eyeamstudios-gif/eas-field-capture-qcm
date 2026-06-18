@@ -3,59 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0d1117">
-  <meta name="description" content="EAS Field Capture QCM — Field documentation quality control for XPD and EAS service pathways">
+  <meta name="theme-color" content="#06080c">
+  <meta name="description" content="EAS Field Capture QCM — Executive-grade field documentation quality control for XPD and EAS service pathways">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Field Capture QCM — EAS | UECS</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('eas-fc-theme');
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
+  <div class="app-backdrop" aria-hidden="true"></div>
+
   <header class="app-header">
-    <div>
-      <h1>Field Capture QCM</h1>
-      <div class="subtitle">EAS | UECS Field Capture + QCM Intake</div>
+    <div class="header-brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="28" height="28" rx="8" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="16" cy="13" r="5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="16" cy="13" r="2" fill="currentColor"/>
+          <path d="M10 24h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="header-titles">
+        <h1>Field Capture QCM</h1>
+        <div class="subtitle">EAS · UECS Executive Field Suite</div>
+      </div>
     </div>
     <div class="header-actions">
-      <span id="offline-indicator" class="offline-indicator online">Online</span>
+      <span id="header-breadcrumb" class="header-breadcrumb">Home</span>
+      <button type="button" id="btn-theme-toggle" class="theme-toggle" aria-label="Toggle light mode" title="Toggle appearance">
+        <svg class="icon-sun" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.93 4.93l1.41 1.41M13.66 13.66l1.41 1.41M4.93 15.07l1.41-1.41M13.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg class="icon-moon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M15.5 11.5a6.5 6.5 0 01-8-8 6.5 6.5 0 108 8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
+      <span id="offline-indicator" class="status-pill online">
+        <span class="status-dot"></span>
+        <span class="status-label">Online</span>
+      </span>
     </div>
   </header>
 
   <main class="app-main">
     <!-- Home -->
     <section id="screen-home" class="screen active">
-      <h2 class="screen-title">Start Field Capture</h2>
-      <p class="screen-subtitle">EAS Field Capture QCM v1.0 — Documentation quality control before you leave the site.</p>
-
-      <div class="btn-group">
-        <button id="btn-start-project" class="btn btn-primary">Start Field Capture</button>
-        <button id="btn-continue-project" class="btn btn-secondary hidden">Continue Project</button>
+      <div class="hero-panel">
+        <p class="hero-eyebrow">Executive Field Documentation</p>
+        <h2 class="screen-title hero-title">Capture with confidence.<br>Leave the site ready.</h2>
+        <p class="screen-subtitle hero-subtitle">Real-time QCM scoring, structured capture workflows, and export-ready packets — built for field professionals who deliver at the highest standard.</p>
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <span class="hero-metric-value">QCM</span>
+            <span class="hero-metric-label">Live scoring</span>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-value">Offline</span>
+            <span class="hero-metric-label">First PWA</span>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-value">UECS</span>
+            <span class="hero-metric-label">Ready export</span>
+          </div>
+        </div>
       </div>
 
-      <div class="card" style="margin-top:24px">
-        <div class="card-header">Project Auto-Load</div>
-        <p class="screen-subtitle">Import a UECS Lite project packet to auto-fill client and site details before capture.</p>
+      <div class="action-stack">
+        <button id="btn-start-project" class="btn btn-primary btn-hero">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Start Field Capture
+        </button>
+        <button id="btn-continue-project" class="btn btn-secondary hidden">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M6 4l8 6-8 6V4z" fill="currentColor"/></svg>
+          Continue Active Project
+        </button>
+      </div>
+
+      <div class="card card-elevated">
+        <div class="card-header-row">
+          <div class="card-header">Project Auto-Load</div>
+          <span class="card-tag">UECS Lite</span>
+        </div>
+        <p class="card-lead">Import a UECS Lite project packet to auto-fill client and site details before capture.</p>
         <input type="file" id="project-import-file" class="hidden" accept="application/json,.json">
-        <button id="btn-import-project" class="btn btn-secondary">Import Project Info</button>
-        <div id="project-import-status" style="margin-top:12px"></div>
+        <button id="btn-import-project" class="btn btn-secondary">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M10 13V3M10 13l-4-4M10 13l4-4M3 15v1a1 1 0 001 1h12a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Import Project Info
+        </button>
+        <div id="project-import-status" class="card-footer-slot"></div>
       </div>
 
-      <div class="card" style="margin-top:24px">
-        <div class="card-header">Recent Projects</div>
-        <div id="project-list"></div>
+      <div class="card">
+        <div class="card-header-row">
+          <div class="card-header">Recent Projects</div>
+          <span id="project-count-badge" class="card-tag hidden">0</span>
+        </div>
+        <div class="project-toolbar">
+          <div class="search-field">
+            <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M14 14l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="search" id="project-search" class="form-control search-input" placeholder="Search by project, client, or pathway…" autocomplete="off">
+          </div>
+          <select id="project-filter" class="form-control filter-select" aria-label="Filter projects">
+            <option value="all">All projects</option>
+            <option value="active">Active project</option>
+            <option value="xpd">XPD pathways</option>
+            <option value="eas">EAS pathways</option>
+          </select>
+        </div>
+        <div id="project-list" class="project-list"></div>
+        <p id="project-list-empty" class="card-lead hidden">No projects match your search.</p>
       </div>
     </section>
 
     <!-- Project Intake -->
     <section id="screen-intake" class="screen">
-      <h2 class="screen-title">Project Intake</h2>
-      <p class="screen-subtitle">Enter project details before field capture.</p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Project Intake</h2>
+        <p class="screen-subtitle">Establish project context before field capture begins.</p>
+      </div>
       <div id="intake-autofill-status"></div>
 
-      <form id="intake-form">
+      <form id="intake-form" class="form-stack">
         <div class="card">
           <div class="card-header">Project Information</div>
           <div class="form-group">
@@ -124,12 +202,12 @@
             </select>
           </div>
           <div id="aerial-section" class="hidden">
-            <label style="font-size:0.8rem;color:var(--text-secondary)">Aerial Status (Phase 1 Placeholder)</label>
-            <div class="aerial-options">
-              <label class="aerial-option"><input type="radio" name="aerial_status" value="pending"> Aerial capture pending</label>
-              <label class="aerial-option"><input type="radio" name="aerial_status" value="not_required" checked> Aerial not required</label>
-              <label class="aerial-option"><input type="radio" name="aerial_status" value="separate"> Aerial captured separately</label>
-              <label class="aerial-option"><input type="radio" name="aerial_status" value="ground_only"> Ground-only package</label>
+            <label class="form-section-label">Aerial Status (Phase 1 Placeholder)</label>
+            <div class="option-list">
+              <label class="option-item"><input type="radio" name="aerial_status" value="pending"> Aerial capture pending</label>
+              <label class="option-item"><input type="radio" name="aerial_status" value="not_required" checked> Aerial not required</label>
+              <label class="option-item"><input type="radio" name="aerial_status" value="separate"> Aerial captured separately</label>
+              <label class="option-item"><input type="radio" name="aerial_status" value="ground_only"> Ground-only package</label>
             </div>
           </div>
         </div>
@@ -169,74 +247,134 @@
         </div>
 
         <div class="btn-group">
-          <button type="submit" class="btn btn-primary">Create Project &amp; View Shot List</button>
-          <button type="button" id="btn-back-home" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Project &amp; Begin Capture</button>
+          <button type="button" id="btn-back-home" class="btn btn-ghost">Cancel</button>
         </div>
       </form>
     </section>
 
     <!-- Shot List -->
     <section id="screen-shots" class="screen">
-      <h2 class="screen-title">Shot List Dashboard</h2>
-      <p class="screen-subtitle" id="shots-pathway-title"></p>
-      <p id="shots-target" style="color:var(--accent-gold);font-size:0.875rem;margin-bottom:16px"></p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Shot List</h2>
+        <p class="screen-subtitle" id="shots-pathway-title"></p>
+        <p id="shots-target" class="target-chip"></p>
+      </div>
 
-      <div id="shot-list"></div>
+      <div id="shot-list" class="shot-list"></div>
 
       <div class="btn-group">
         <button class="btn btn-primary" data-nav="capture">Capture Required Shot</button>
-        <button class="btn btn-secondary" data-nav="screen-dashboard">Project Dashboard</button>
+        <button class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
     </section>
 
     <!-- Dashboard -->
     <section id="screen-dashboard" class="screen">
-      <h2 class="screen-title" id="dash-project-id">Project</h2>
-      <p class="screen-subtitle" id="dash-pathway"></p>
-      <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px" id="dash-client"></p>
+      <div class="dash-hero card card-elevated">
+        <div class="dash-hero-top">
+          <div>
+            <p class="dash-eyebrow">Active Project</p>
+            <h2 class="screen-title dash-title" id="dash-project-id">Project</h2>
+            <p class="dash-pathway" id="dash-pathway"></p>
+            <p class="dash-client" id="dash-client"></p>
+          </div>
+          <div class="readiness-ring-wrap" aria-hidden="true">
+            <svg class="readiness-ring" viewBox="0 0 80 80">
+              <circle class="ring-track" cx="40" cy="40" r="34"/>
+              <circle id="dash-ring-progress" class="ring-progress" cx="40" cy="40" r="34"/>
+            </svg>
+            <span id="dash-ring-label" class="ring-label">0%</span>
+          </div>
+        </div>
 
-      <div id="dash-readiness" class="readiness-banner incomplete">Field Capture Incomplete</div>
-      <div class="progress-bar"><div id="dash-progress-fill" class="progress-fill" style="width:0%"></div></div>
-      <p id="dash-progress-text" style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:16px"></p>
+        <div id="dash-readiness" class="readiness-banner incomplete">Field Capture Incomplete</div>
+        <div class="progress-bar progress-bar-lg">
+          <div id="dash-progress-fill" class="progress-fill" style="width:0%"></div>
+        </div>
+        <p id="dash-progress-text" class="progress-caption"></p>
+      </div>
 
-      <div class="coverage-stats" id="dash-stats"></div>
+      <div class="coverage-stats kpi-grid" id="dash-stats"></div>
 
       <!-- Simple Field Method (XPD Exterior Baseline) -->
-      <div id="sfm-dashboard" class="card hidden">
-        <div class="card-header" id="sfm-method-name">Simple Field Method</div>
-        <p id="sfm-method-desc" class="pass-instruction"></p>
-        <p id="sfm-guidance" class="sfm-guidance"></p>
+      <div id="sfm-dashboard" class="card card-elevated hidden">
+        <div class="card-header-row">
+          <div class="card-header" id="sfm-method-name">Simple Field Method</div>
+          <span class="card-tag card-tag-gold">XPD Ground</span>
+        </div>
+        <p id="sfm-method-desc" class="card-lead"></p>
+        <p id="sfm-guidance" class="guidance-panel"></p>
+
+        <div id="pass-stepper" class="pass-stepper" aria-label="Capture workflow">
+          <div class="step" data-step="1">
+            <div class="step-indicator"><span>1</span></div>
+            <div class="step-content">
+              <span class="step-title">Exterior Record</span>
+              <span id="stepper-pass1" class="step-meta">—</span>
+            </div>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step" data-step="2">
+            <div class="step-indicator"><span>2</span></div>
+            <div class="step-content">
+              <span class="step-title">Detail Capture</span>
+              <span id="stepper-pass2" class="step-meta">—</span>
+            </div>
+          </div>
+          <div class="step-connector"></div>
+          <div class="step" data-step="3">
+            <div class="step-indicator"><span>3</span></div>
+            <div class="step-content">
+              <span class="step-title">Final QA</span>
+              <span id="stepper-pass3" class="step-meta">—</span>
+            </div>
+          </div>
+        </div>
 
         <div id="sfm-warnings" class="hidden"></div>
         <div id="overcapture-warning" class="hidden"></div>
 
         <div id="ground-capture-dashboard" class="ground-capture-dashboard"></div>
 
-        <div class="pass-card">
-          <h4>Pass 1: Four-Side Exterior Record</h4>
-          <p id="sfm-pass1-status" class="pass-status">0 / 12 required views complete</p>
-        </div>
-        <div class="pass-card">
-          <h4>Pass 2: Controlled Detail Capture</h4>
-          <p id="sfm-pass2-status" class="pass-status">0 / 10 detail categories complete</p>
-        </div>
-        <div class="pass-card">
-          <h4>Pass 3: Final QA Fill</h4>
-          <p id="sfm-pass3-status" class="pass-status">Not started</p>
+        <div class="pass-cards">
+          <div class="pass-card">
+            <div class="pass-card-icon">1</div>
+            <div>
+              <h4>Pass 1: Four-Side Exterior Record</h4>
+              <p id="sfm-pass1-status" class="pass-status">0 / 12 required views complete</p>
+            </div>
+          </div>
+          <div class="pass-card">
+            <div class="pass-card-icon">2</div>
+            <div>
+              <h4>Pass 2: Controlled Detail Capture</h4>
+              <p id="sfm-pass2-status" class="pass-status">0 / 10 detail categories complete</p>
+            </div>
+          </div>
+          <div class="pass-card">
+            <div class="pass-card-icon">3</div>
+            <div>
+              <h4>Pass 3: Final QA Fill</h4>
+              <p id="sfm-pass3-status" class="pass-status">Not started</p>
+            </div>
+          </div>
         </div>
 
-        <div class="btn-group" style="margin-top:12px">
+        <div class="btn-group btn-group-tight">
           <button type="button" id="btn-start-pass1" class="btn btn-primary">Start Pass 1</button>
-          <button type="button" id="btn-capture-next-view" class="btn btn-primary">Capture Next Required View</button>
-          <button type="button" id="btn-mark-not-accessible" class="btn btn-outline">Mark Not Accessible</button>
+          <button type="button" id="btn-capture-next-view" class="btn btn-primary">Capture Next View</button>
+          <button type="button" id="btn-mark-not-accessible" class="btn btn-ghost">Mark Not Accessible</button>
           <button type="button" id="btn-capture-detail" class="btn btn-secondary hidden">Capture Detail</button>
           <button type="button" id="btn-run-final-qa" class="btn btn-warning hidden">Run Final QA</button>
-          <button type="button" id="btn-view-missing" class="btn btn-outline btn-sm">View Missing Shots</button>
-          <button type="button" id="btn-finish-capture" class="btn btn-success btn-sm">Finish Field Capture</button>
+          <div class="btn-row-secondary">
+            <button type="button" id="btn-view-missing" class="btn btn-ghost btn-sm">View Missing Shots</button>
+            <button type="button" id="btn-finish-capture" class="btn btn-success btn-sm">Finish Capture</button>
+          </div>
         </div>
       </div>
 
-      <div id="site-limitation-panel" class="card hidden">
+      <div id="site-limitation-panel" class="card card-inset hidden">
         <div class="card-header">Mark Site Limitation</div>
         <div class="form-group">
           <label for="site-limitation-target">Required shot</label>
@@ -252,49 +390,70 @@
         </div>
         <div class="btn-group row">
           <button type="button" id="btn-save-site-limitation" class="btn btn-primary">Save Site Limitation</button>
-          <button type="button" id="btn-cancel-site-limitation" class="btn btn-secondary">Cancel</button>
+          <button type="button" id="btn-cancel-site-limitation" class="btn btn-ghost">Cancel</button>
         </div>
       </div>
 
-      <nav class="bottom-nav">
-        <button class="nav-tab active" data-nav="screen-dashboard">Dashboard</button>
-        <button class="nav-tab" id="legacy-shots-nav" data-nav="shots">Shots</button>
-        <button class="nav-tab" data-nav="capture">Capture</button>
-        <button class="nav-tab" data-nav="coverage">Coverage</button>
+      <nav class="bottom-nav dock-nav" aria-label="Project navigation">
+        <button class="nav-tab active" data-nav="screen-dashboard">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-tab" id="legacy-shots-nav" data-nav="shots">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>Shots</span>
+        </button>
+        <button class="nav-tab nav-tab-capture" data-nav="capture">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+          <span>Capture</span>
+        </button>
+        <button class="nav-tab" data-nav="coverage">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 20l7-7 4 4 7-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Coverage</span>
+        </button>
       </nav>
 
       <div class="btn-group" id="legacy-dash-actions">
         <button class="btn btn-primary" data-nav="capture">Capture Required Shot</button>
         <button class="btn btn-secondary" data-nav="coverage">View Coverage</button>
-        <button class="btn btn-outline btn-sm" data-nav="final">Final Review</button>
-        <button type="button" class="btn btn-outline btn-sm" id="btn-view-missing-legacy">View Missing Shots</button>
-        <button class="btn btn-success btn-sm" data-nav="export">Export Project Packet</button>
+        <button class="btn btn-ghost btn-sm" data-nav="final">Final Review</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-view-missing-legacy">View Missing Shots</button>
+        <button class="btn btn-success btn-sm" data-nav="export">Export Packet</button>
       </div>
     </section>
 
     <!-- Capture -->
     <section id="screen-capture" class="screen">
-      <h2 class="screen-title">Capture Photo</h2>
-      <p class="screen-subtitle">Use phone camera to capture field documentation.</p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Capture</h2>
+        <p class="screen-subtitle">Document the site with guided QCM validation.</p>
+      </div>
       <p id="capture-replacement-notice" class="alert alert-info hidden"></p>
 
-      <div id="capture-sfm-view" class="card hidden">
+      <div id="capture-sfm-view" class="card card-inset hidden">
         <div class="card-header">Simple Field Method — <span id="capture-pass-label">Pass 1</span></div>
-        <p><strong>Required view:</strong> <span id="capture-view-label">—</span></p>
+        <p class="capture-view-label"><strong>Required view:</strong> <span id="capture-view-label">—</span></p>
       </div>
 
       <div class="camera-container">
+        <div class="viewfinder-corners" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
         <video id="camera-video" autoplay playsinline muted></video>
         <canvas id="camera-canvas" class="hidden"></canvas>
         <img id="capture-preview" class="hidden" alt="Preview">
         <div id="live-camera-section" class="camera-placeholder hidden">
-          <p>Live camera loading...</p>
+          <svg viewBox="0 0 48 48" fill="none" width="48" height="48"><rect x="6" y="12" width="36" height="28" rx="4" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="26" r="8" stroke="currentColor" stroke-width="2"/></svg>
+          <p>Initializing camera…</p>
         </div>
       </div>
 
       <div class="camera-controls">
-        <button id="btn-capture-file" class="btn btn-primary btn-sm" style="width:auto">📷 Capture Photo</button>
-        <button id="btn-capture-live" class="btn btn-secondary btn-sm hidden" style="width:auto">Live Capture</button>
+        <button id="btn-capture-file" class="btn btn-primary capture-trigger">
+          <span class="capture-trigger-inner"></span>
+          <span class="capture-trigger-label">Capture Photo</span>
+        </button>
+        <button id="btn-capture-live" class="btn btn-secondary btn-sm hidden">Live Capture</button>
       </div>
 
       <div id="capture-meta-section" class="card hidden">
@@ -347,42 +506,46 @@
           </div>
         </div>
         <div id="wide-context-section" class="hidden">
-          <label style="font-size:0.8rem;color:var(--text-secondary)">Is there a wide context image for this condition?</label>
-          <div class="aerial-options">
-            <label class="aerial-option"><input type="radio" name="wide_context" value="yes"> Yes, already captured</label>
-            <label class="aerial-option"><input type="radio" name="wide_context" value="capture_now"> Capture wide context now</label>
-            <label class="aerial-option"><input type="radio" name="wide_context" value="not_applicable"> Not applicable</label>
-            <label class="aerial-option"><input type="radio" name="wide_context" value="admin_review"> Admin review</label>
+          <label class="form-section-label">Is there a wide context image for this condition?</label>
+          <div class="option-list">
+            <label class="option-item"><input type="radio" name="wide_context" value="yes"> Yes, already captured</label>
+            <label class="option-item"><input type="radio" name="wide_context" value="capture_now"> Capture wide context now</label>
+            <label class="option-item"><input type="radio" name="wide_context" value="not_applicable"> Not applicable</label>
+            <label class="option-item"><input type="radio" name="wide_context" value="admin_review"> Admin review</label>
           </div>
         </div>
         <div class="form-group">
           <label for="capture-notes">Field Notes</label>
           <textarea id="capture-notes" class="form-control" placeholder="Visual condition noted, access notes, etc."></textarea>
         </div>
-        <button id="btn-run-qcm" class="btn btn-secondary hidden">Run QCM</button>
+        <button id="btn-run-qcm" class="btn btn-secondary hidden">Run QCM Analysis</button>
       </div>
 
       <div id="qcm-result-panel" class="hidden"></div>
 
       <div id="capture-actions" class="btn-group hidden">
         <button id="btn-accept-image" class="btn btn-success">Accept Image</button>
-        <button id="btn-retake" class="btn btn-warning">Retake Image</button>
-        <button id="btn-admin-review" class="btn btn-outline">Mark Admin Review</button>
+        <button id="btn-retake" class="btn btn-warning">Retake</button>
+        <button id="btn-admin-review" class="btn btn-ghost">Mark Admin Review</button>
       </div>
 
-      <button class="btn btn-secondary" data-nav="screen-dashboard" style="margin-top:12px">Back to Dashboard</button>
+      <button class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
     </section>
 
     <!-- Coverage -->
     <section id="screen-coverage" class="screen">
-      <h2 class="screen-title">Coverage Dashboard</h2>
-      <p class="screen-subtitle" id="coverage-title"></p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Coverage</h2>
+        <p class="screen-subtitle" id="coverage-title"></p>
+      </div>
 
       <div id="coverage-readiness" class="readiness-banner incomplete"></div>
-      <p id="coverage-message" style="margin-bottom:12px;font-size:0.875rem"></p>
-      <div class="progress-bar"><div id="coverage-progress-fill" class="progress-fill" style="width:0%"></div></div>
+      <p id="coverage-message" class="coverage-message"></p>
+      <div class="progress-bar progress-bar-lg">
+        <div id="coverage-progress-fill" class="progress-fill" style="width:0%"></div>
+      </div>
 
-      <div class="coverage-stats" id="coverage-stats"></div>
+      <div class="coverage-stats kpi-grid" id="coverage-stats"></div>
       <div id="coverage-missing"></div>
 
       <div class="card">
@@ -392,21 +555,31 @@
 
       <div class="btn-group">
         <button class="btn btn-primary" data-nav="capture">Capture Required Shot</button>
-        <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+        <button class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
     </section>
 
-    <!-- Final QA (Simple Field Method Pass 3) -->
+    <!-- Final QA -->
     <section id="screen-final-qa" class="screen">
-      <h2 class="screen-title">Pass 3: Final QA Fill</h2>
-      <p class="screen-subtitle" id="qa-instruction"></p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Pass 3: Final QA</h2>
+        <p class="screen-subtitle" id="qa-instruction"></p>
+      </div>
 
       <div id="qa-readiness" class="readiness-banner incomplete"></div>
 
-      <div class="card">
+      <div class="card card-inset">
         <div class="card-header">Package Status</div>
-        <p>Usable images: <strong id="qa-usable-count">0</strong></p>
-        <p>Target range: <strong id="qa-target-range">25–45</strong></p>
+        <div class="qa-stats">
+          <div class="qa-stat">
+            <span class="qa-stat-value" id="qa-usable-count">0</span>
+            <span class="qa-stat-label">Usable images</span>
+          </div>
+          <div class="qa-stat">
+            <span class="qa-stat-value" id="qa-target-range">25–45</span>
+            <span class="qa-stat-label">Target range</span>
+          </div>
+        </div>
       </div>
 
       <div id="qa-missing-views"></div>
@@ -416,21 +589,23 @@
 
       <div class="card">
         <div class="card-header">Final QA Checklist</div>
-        <div id="qa-checklist" class="aerial-options"></div>
+        <div id="qa-checklist" class="option-list"></div>
       </div>
 
       <div class="btn-group">
         <button type="button" id="btn-complete-qa" class="btn btn-success">Complete Final QA</button>
-        <button type="button" class="btn btn-primary" data-nav="capture">Capture Missing Required View</button>
-        <button type="button" class="btn btn-outline btn-sm" id="btn-add-context">Add Justified Context View</button>
-        <button type="button" class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+        <button type="button" class="btn btn-primary" data-nav="capture">Capture Missing View</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-add-context">Add Context View</button>
+        <button type="button" class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
     </section>
 
     <!-- Final Review -->
     <section id="screen-final" class="screen">
-      <h2 class="screen-title">Final QCM Summary</h2>
-      <p class="screen-subtitle">Review package readiness before export.</p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Final QCM Summary</h2>
+        <p class="screen-subtitle">Review package readiness before export.</p>
+      </div>
 
       <div id="final-readiness" class="readiness-banner incomplete"></div>
       <div id="final-warning"></div>
@@ -439,35 +614,39 @@
       <div class="btn-group">
         <button class="btn btn-success" data-nav="export">Export Project Packet</button>
         <button class="btn btn-primary" data-nav="capture">Continue Capture</button>
-        <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+        <button class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
     </section>
 
     <!-- Export -->
     <section id="screen-export" class="screen">
-      <h2 class="screen-title">Export Project Packet</h2>
-      <p class="screen-subtitle">Download UECS / XPD / ClientFlow-ready project files.</p>
+      <div class="screen-intro">
+        <h2 class="screen-title">Export</h2>
+        <p class="screen-subtitle">Download UECS / XPD / ClientFlow-ready project files.</p>
+      </div>
 
-      <div class="card">
+      <div class="card card-elevated">
         <div class="card-header">Project: <span id="export-project-id">—</span></div>
-        <div class="export-item"><span>project_packet.json</span><span class="badge badge-muted">JSON</span></div>
-        <div class="export-item"><span>image_manifest.json</span><span class="badge badge-muted">JSON</span></div>
-        <div class="export-item"><span>qcm_summary.json</span><span class="badge badge-muted">JSON</span></div>
-        <div class="export-item"><span>field_capture_report.html</span><span class="badge badge-muted">HTML</span></div>
+        <div class="export-list">
+          <div class="export-item"><span class="export-filename">project_packet.json</span><span class="badge badge-muted">JSON</span></div>
+          <div class="export-item"><span class="export-filename">image_manifest.json</span><span class="badge badge-muted">JSON</span></div>
+          <div class="export-item"><span class="export-filename">qcm_summary.json</span><span class="badge badge-muted">JSON</span></div>
+          <div class="export-item"><span class="export-filename">field_capture_report.html</span><span class="badge badge-muted">HTML</span></div>
+        </div>
       </div>
 
       <div id="export-status"></div>
 
       <div class="card">
         <div class="card-header">UECS Lite Delivery</div>
-        <p class="screen-subtitle">Queue the field packet on this device for UECS Lite sync. The queued packet uses the same JSON payload as export.</p>
+        <p class="card-lead">Queue the field packet on this device for UECS Lite sync. The queued packet uses the same JSON payload as export.</p>
         <div id="uecs-queue-status"></div>
       </div>
 
       <div class="btn-group">
         <button id="btn-export" class="btn btn-primary">Export Project Packet</button>
         <button id="btn-send-uecs-lite" class="btn btn-success">Send to UECS Lite</button>
-        <button class="btn btn-secondary" data-nav="screen-dashboard">Back to Dashboard</button>
+        <button class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
     </section>
   </main>
@@ -475,6 +654,8 @@
   <footer class="app-footer">
     <p class="footer-disclaimer" id="footer-disclaimer"></p>
   </footer>
+
+  <div id="toast-stack" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
   <script type="module" src="/js/app.js"></script>
   <script>
