@@ -6,7 +6,9 @@ import {
   DISCLAIMER,
   SERVICE_PATHWAYS,
   AERIAL_PATHWAYS,
-  PATHWAY_DOC_CONTROL,
+  DOC_CONTROL_CLASSIFICATION,
+  applyXpdProjectMetadata,
+  assertXpdPathway,
   generateId,
   formatDate,
   formatDateTime,
@@ -392,14 +394,26 @@ function resetIntakeForm() {
   $('#intake-governance-banner').innerHTML = '';
   $('#intake-capture-method-display').innerHTML = '';
   $('#project-date').value = formatDate();
-  $('#doc-control').value = PATHWAY_DOC_CONTROL[SERVICE_PATHWAYS.XPD_BASELINE];
+  $('#doc-control').value = DOC_CONTROL_CLASSIFICATION;
+  $('#stormready-eligible').value = '';
+  $('#stormready-section')?.classList.add('hidden');
   updateManualOverrideSection();
   onPathwayChange();
 }
 
 function onPathwayChange() {
   const pathway = $('#pathway-select').value;
-  $('#doc-control').value = PATHWAY_DOC_CONTROL[pathway] || 'UECS-Lite';
+  const shotConfig = generateShotList(pathway);
+
+  try {
+    assertXpdPathway(pathway);
+  } catch (err) {
+    showToast(err.message, 'warning');
+    return;
+  }
+
+  $('#doc-control').value = DOC_CONTROL_CLASSIFICATION;
+  $('#doc-level').value = shotConfig.documentationLevel;
   const aerialSection = $('#aerial-section');
   if (AERIAL_PATHWAYS.includes(pathway)) {
     aerialSection?.classList.remove('hidden');
@@ -409,7 +423,9 @@ function onPathwayChange() {
 
   const draftProject = {
     service_pathway: pathway,
-    documentation_control_classification: $('#doc-control').value,
+    documentation_family: 'XPD',
+    documentation_control_classification: DOC_CONTROL_CLASSIFICATION,
+    documentation_level: shotConfig.documentationLevel,
     default_capture_method: isXpdPathway(pathway) ? DEFAULT_CAPTURE_METHOD : null,
     field_capture_qcm: isXpdPathway(pathway),
     admin_review_required: true,
@@ -499,8 +515,12 @@ function populateIntakeForm(project) {
     const hasPathway = Array.from(pathwaySelect.options).some((o) => o.value === project.service_pathway);
     pathwaySelect.value = hasPathway ? project.service_pathway : SERVICE_PATHWAYS.XPD_BASELINE;
   }
-  setValue('#doc-level', project.documentation_level);
-  setValue('#doc-control', project.documentation_control_classification || 'UECS-Lite');
+  setValue('#doc-level', project.documentation_level || project.service_pathway);
+  setValue('#doc-control', DOC_CONTROL_CLASSIFICATION);
+  setValue('#stormready-eligible', project.stormready_eligible ?? '');
+  if (project.stormready_eligible != null && project.stormready_eligible !== '') {
+    $('#stormready-section')?.classList.remove('hidden');
+  }
   setValue('#field-user', project.field_user);
   setValue('#project-date', project.date || formatDate());
   setValue('#weather', project.weather);
@@ -510,8 +530,8 @@ function populateIntakeForm(project) {
   setValue('#internal-notes', project.internal_notes);
 
   onPathwayChange();
-  setValue('#doc-level', project.documentation_level);
-  setValue('#doc-control', project.documentation_control_classification || 'UECS-Lite');
+  setValue('#doc-level', project.documentation_level || project.service_pathway);
+  setValue('#doc-control', DOC_CONTROL_CLASSIFICATION);
   if (project.aerial_status) {
     const aerial = $$('input[name="aerial_status"]').find((el) => el.value === project.aerial_status);
     if (aerial) aerial.checked = true;
@@ -526,6 +546,13 @@ async function handleIntakeSubmit(e) {
   e.preventDefault();
   const pathway = $('#pathway-select').value;
   const isManualStart = !state.importedProjectSource;
+
+  try {
+    assertXpdPathway(pathway);
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
 
   if (isManualStart) {
     const overrideErrors = validateManualOverride({
@@ -551,8 +578,11 @@ async function handleIntakeSubmit(e) {
     state: $('#state').value.trim(),
     zip: $('#zip').value.trim(),
     service_pathway: pathway,
+    documentation_family: 'XPD',
     documentation_level: $('#doc-level').value.trim() || generateShotList(pathway).documentationLevel,
-    documentation_control_classification: $('#doc-control').value,
+    documentation_control_classification: DOC_CONTROL_CLASSIFICATION,
+    documentation_purpose: $('#purpose').value.trim(),
+    stormready_eligible: $('#stormready-eligible').value.trim() || null,
     field_user: $('#field-user').value.trim(),
     date: $('#project-date').value,
     weather: $('#weather').value.trim(),
@@ -598,6 +628,8 @@ async function handleIntakeSubmit(e) {
     applyManualOverrideFlags(project, $('#override-reason').value);
   }
 
+  applyXpdProjectMetadata(project);
+
   state.project = project;
   state.shotList = generateShotList(pathway);
   state.images = [];
@@ -624,9 +656,15 @@ async function handlePathwaySave() {
     return;
   }
   const pathway = selected.dataset.pathway;
+  try {
+    assertXpdPathway(pathway);
+  } catch (err) {
+    alert(err.message);
+    return;
+  }
   state.project.service_pathway = pathway;
   state.project.documentation_level = generateShotList(pathway).documentationLevel;
-  state.project.documentation_control_classification = PATHWAY_DOC_CONTROL[pathway];
+  applyXpdProjectMetadata(state.project);
   state.project.updated_at = formatDateTime();
   state.shotList = generateShotList(pathway);
   await saveProject(state.project);
@@ -680,8 +718,8 @@ function filterProjectList() {
     filtered = filtered.filter((p) => p.project_id === activeId);
   } else if (filter === 'xpd') {
     filtered = filtered.filter((p) => (p.service_pathway || '').startsWith('XPD'));
-  } else if (filter === 'eas') {
-    filtered = filtered.filter((p) => (p.service_pathway || '').startsWith('EAS'));
+  } else if (filter === 'stormready') {
+    filtered = filtered.filter((p) => (p.service_pathway || '').includes('StormReady'));
   }
 
   if (query) {

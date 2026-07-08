@@ -1,35 +1,64 @@
 /**
- * EAS Field Capture QCM — Utilities
+ * XPD Field Capture QCM — Utilities
+ *
+ * Field Capture QCM Version 1.0 is intentionally limited to XPD and UECS Lite workflows.
+ * Enterprise documentation levels (EAS/EDIS, Levels I–V, spatial, inspection, LiDAR,
+ * controlled evidence, etc.) will be implemented in a future Enterprise capture module.
  */
 
-export const SYSTEM_NAME = 'EAS | UECS Field Capture + QCM Intake System';
-export const VERSION = 'EAS Field Capture QCM v1.0';
-export const PHASE = 'Phase 1 Phone Camera PWA';
+export const SYSTEM_NAME = 'XPD Field Capture QCM | UECS Lite Intake System';
+export const VERSION = 'XPD Field Capture QCM v1.0';
+export const PHASE = 'Phase 1 Phone Camera PWA — XPD Only';
+
+export const DOCUMENTATION_FAMILY = 'XPD';
+export const DOC_CONTROL_CLASSIFICATION = 'UECS Lite';
+
+/** @deprecated v1.0 — use DOC_CONTROL_CLASSIFICATION; kept for legacy import normalization */
+export const DOC_CONTROL_OPTIONS = [DOC_CONTROL_CLASSIFICATION];
 
 export const DISCLAIMER =
   'This system supports visual and spatial documentation quality control only. QCM results evaluate image clarity, coverage, metadata, and documentation readiness. QCM does not provide engineering opinions, inspection conclusions, code compliance determinations, damage diagnosis, or repair recommendations.';
 
 export const SERVICE_PATHWAYS = {
+  XPD_STORMREADY_PRE: 'XPD StormReady Residential – Pre-Storm Baseline',
+  XPD_STORMREADY_POST: 'XPD StormReady Residential – Post-Storm Comparison',
   XPD_STORM: 'XPD Storm Snapshot',
   XPD_BASELINE: 'XPD Exterior Baseline Snapshot',
   XPD_PROPERTY: 'XPD Exterior Property Record',
   XPD_AERIAL: 'XPD Exterior + Aerial Baseline',
-  EAS_LEVEL_I: 'EAS Level I Baseline Documentation',
-  EAS_LEVEL_II: 'EAS Level II Inspection Documentation',
-  EAS_LEVEL_III: 'EAS Level III Spatial Documentation',
 };
 
-export const DOC_CONTROL_OPTIONS = ['UECS-Lite', 'UECS-S', 'UECS-V', 'Admin Review Required'];
+export const XPD_PATHWAY_VALUES = Object.values(SERVICE_PATHWAYS);
 
-export const PATHWAY_DOC_CONTROL = {
-  [SERVICE_PATHWAYS.XPD_STORM]: 'UECS-Lite',
-  [SERVICE_PATHWAYS.XPD_BASELINE]: 'UECS-Lite',
-  [SERVICE_PATHWAYS.XPD_PROPERTY]: 'UECS-Lite',
-  [SERVICE_PATHWAYS.XPD_AERIAL]: 'UECS-Lite',
-  [SERVICE_PATHWAYS.EAS_LEVEL_I]: 'UECS-S',
-  [SERVICE_PATHWAYS.EAS_LEVEL_II]: 'UECS-S',
-  [SERVICE_PATHWAYS.EAS_LEVEL_III]: 'UECS-S',
-};
+export const PATHWAY_DOC_CONTROL = Object.fromEntries(
+  XPD_PATHWAY_VALUES.map((pathway) => [pathway, DOC_CONTROL_CLASSIFICATION])
+);
+
+export function normalizeDocControl(value) {
+  if (value == null || value === '') return DOC_CONTROL_CLASSIFICATION;
+  const normalized = String(value).trim().toLowerCase().replace(/-/g, ' ');
+  if (normalized === 'uecs lite' || normalized === 'uecs s' || normalized === 'uecs v') {
+    return DOC_CONTROL_CLASSIFICATION;
+  }
+  return DOC_CONTROL_CLASSIFICATION;
+}
+
+export function isXpdPathway(pathway) {
+  return (pathway || '').startsWith('XPD');
+}
+
+export function assertXpdPathway(pathway) {
+  if (!isXpdPathway(pathway)) {
+    throw new Error('Only XPD documentation packages are supported in Field Capture QCM v1.0.');
+  }
+}
+
+export function applyXpdProjectMetadata(project) {
+  if (!project || typeof project !== 'object') return project;
+  project.documentation_family = DOCUMENTATION_FAMILY;
+  project.documentation_control_classification = DOC_CONTROL_CLASSIFICATION;
+  return project;
+}
 
 export const AERIAL_PATHWAYS = [
   SERVICE_PATHWAYS.XPD_AERIAL,

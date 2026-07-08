@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#06080c">
-  <meta name="description" content="EAS Field Capture QCM — Executive-grade field documentation quality control for XPD and EAS service pathways">
+  <meta name="description" content="XPD Field Capture QCM — Phone-first field documentation quality control for XPD packages and UECS Lite deliverables">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Field QCM">
+  <meta name="apple-mobile-web-app-title" content="XPD Capture">
   <meta name="format-detection" content="telephone=no">
-  <title>Field Capture QCM — EAS | UECS</title>
+  <title>XPD Field Capture QCM — UECS Lite</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/assets/icons/icon.svg">
   <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
@@ -41,8 +41,8 @@
         </svg>
       </div>
       <div class="header-titles">
-        <h1>Field Capture QCM</h1>
-        <div class="subtitle">EAS · UECS Executive Field Suite</div>
+        <h1>XPD Field Capture QCM</h1>
+        <div class="subtitle">XPD · UECS Lite Field Suite</div>
       </div>
     </div>
     <div class="header-actions">
@@ -75,8 +75,12 @@
             <span class="hero-metric-label">First PWA</span>
           </div>
           <div class="hero-metric">
-            <span class="hero-metric-value">UECS</span>
-            <span class="hero-metric-label">Ready export</span>
+            <span class="hero-metric-value">XPD</span>
+            <span class="hero-metric-label">Packages only</span>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-value">UECS Lite</span>
+            <span class="hero-metric-label">Deliverables</span>
           </div>
         </div>
       </div>
@@ -100,8 +104,8 @@
             <select id="project-filter" class="form-control filter-select" aria-label="Filter projects">
               <option value="all">All projects</option>
               <option value="active">Active project</option>
-              <option value="xpd">XPD pathways</option>
-              <option value="eas">EAS pathways</option>
+              <option value="xpd">XPD packages</option>
+              <option value="stormready">StormReady packages</option>
             </select>
           </div>
           <div id="project-list" class="project-list"></div>
@@ -204,23 +208,22 @@
         </div>
 
         <div class="card">
-          <div class="card-header">Service Pathway</div>
+          <div class="card-header">XPD Documentation Package</div>
           <div class="form-group">
-            <label for="pathway-select">Service Pathway <span class="required">*</span></label>
+            <label for="pathway-select">XPD Documentation Package <span class="required">*</span></label>
             <select id="pathway-select" class="form-control" required></select>
           </div>
           <div class="form-group">
-            <label for="doc-level">Documentation Level</label>
-            <input type="text" id="doc-level" class="form-control" placeholder="Auto-set from pathway">
+            <label for="doc-level">Package Label</label>
+            <input type="text" id="doc-level" class="form-control" placeholder="Auto-set from package" readonly>
           </div>
           <div class="form-group">
             <label for="doc-control">Documentation Control Classification</label>
-            <select id="doc-control" class="form-control">
-              <option value="UECS-Lite">UECS-Lite</option>
-              <option value="UECS-S">UECS-S</option>
-              <option value="UECS-V">UECS-V</option>
-              <option value="Admin Review Required">Admin Review Required</option>
-            </select>
+            <input type="text" id="doc-control" class="form-control" value="UECS Lite" readonly aria-readonly="true">
+          </div>
+          <div id="stormready-section" class="form-group hidden">
+            <label for="stormready-eligible">StormReady Eligibility</label>
+            <input type="text" id="stormready-eligible" class="form-control" readonly aria-readonly="true" placeholder="From ClientFlow / UECS Lite import">
           </div>
           <div id="aerial-section" class="hidden">
             <label class="form-section-label">Aerial Documentation Status</label>

@@ -2,7 +2,14 @@
  * EAS Field Capture QCM — XPD Governance & Policy Enforcement
  */
 
-import { SERVICE_PATHWAYS, escapeHtml } from './utils.js';
+import {
+  SERVICE_PATHWAYS,
+  DOC_CONTROL_CLASSIFICATION,
+  normalizeDocControl,
+  applyXpdProjectMetadata,
+  isXpdPathway,
+  escapeHtml,
+} from './utils.js';
 
 export const DEFAULT_CAPTURE_METHOD = 'field_capture_qcm';
 export const DEFAULT_CAPTURE_METHOD_LABEL = 'Field Capture QCM';
@@ -55,6 +62,18 @@ export const ENHANCEMENT_KEYS = {
 };
 
 export const PATHWAY_DEFAULTS = {
+  [SERVICE_PATHWAYS.XPD_STORMREADY_PRE]: {
+    targetMin: 25,
+    targetMax: 45,
+    defaultCapture: DEFAULT_CAPTURE_METHOD_LABEL,
+    optionalEnhancements: ['Aerial Context Add-On', 'Enhanced Documentation Add-On'],
+  },
+  [SERVICE_PATHWAYS.XPD_STORMREADY_POST]: {
+    targetMin: 20,
+    targetMax: 40,
+    defaultCapture: DEFAULT_CAPTURE_METHOD_LABEL,
+    optionalEnhancements: ['Aerial Context Add-On', 'Enhanced Documentation Add-On'],
+  },
   [SERVICE_PATHWAYS.XPD_STORM]: {
     targetMin: 15,
     targetMax: 30,
@@ -91,11 +110,7 @@ export const PATHWAY_DEFAULTS = {
   },
 };
 
-const XPD_PATHWAY_PREFIX = 'XPD';
-
-export function isXpdPathway(pathway) {
-  return (pathway || '').startsWith(XPD_PATHWAY_PREFIX);
-}
+export { isXpdPathway } from './utils.js';
 
 export function isLinkedToClientFlow(project) {
   return !!(project?.clientflow_request_id || project?.linked_to_clientflow);
@@ -130,14 +145,21 @@ export function validateUecsLiteImport(data) {
   const docControl = getImportField(data, 'documentation_control_classification');
   const defaultCaptureMethod = getImportField(data, 'default_capture_method');
   const adminReviewRequired = getImportField(data, 'admin_review_required');
+  const stormreadyEligible = getImportField(
+    data,
+    'stormready_eligible',
+    'stormready_eligibility',
+    'storm_ready_eligible'
+  );
 
   if (!clientflowRequestId) errors.push('clientflow_request_id');
   if (!uecsProjectId) errors.push('uecs_project_id');
   if (!clientName) errors.push('client_name');
   if (!projectAddress) errors.push('project_address');
   if (!servicePathway) errors.push('service_pathway');
+  if (servicePathway && !isXpdPathway(servicePathway)) errors.push('service_pathway (XPD packages only)');
   if (!docControl) errors.push('documentation_control_classification');
-  if (!defaultCaptureMethod && !isXpdPathway(servicePathway)) errors.push('default_capture_method');
+  if (!defaultCaptureMethod) errors.push('default_capture_method');
   if (adminReviewRequired == null) errors.push('admin_review_required');
 
   if (errors.length) {
@@ -156,13 +178,15 @@ export function validateUecsLiteImport(data) {
     state: source.state || source.site_state || '',
     zip: source.zip || source.postal_code || source.site_zip || '',
     service_pathway: servicePathway,
-    documentation_level: source.documentation_level || data.documentation_level || '',
-    documentation_control_classification: docControl,
+    documentation_level: source.documentation_level || data.documentation_level || servicePathway,
+    documentation_control_classification: normalizeDocControl(docControl),
     field_user: source.field_user || '',
     date: source.date || new Date().toISOString().split('T')[0],
     weather: source.weather || '',
     site_access_notes: source.site_access_notes || source.access_notes || '',
-    purpose: source.purpose || source.documentation_purpose || '',
+    purpose: source.purpose || source.documentation_purpose || data.documentation_purpose || '',
+    documentation_purpose: source.documentation_purpose || data.documentation_purpose || source.purpose || '',
+    stormready_eligible: stormreadyEligible,
     client_notes: source.client_notes || '',
     internal_notes: source.internal_notes || '',
     clientflow_request_id: clientflowRequestId,
@@ -186,6 +210,8 @@ export function validateUecsLiteImport(data) {
     applyAerialFallback(project);
   }
 
+  applyXpdProjectMetadata(project);
+
   return { valid: true, errors: [], warnings, project };
 }
 
@@ -204,6 +230,8 @@ export function applyXpdCaptureDefaults(project, warnings = []) {
   if (project.admin_review_required == null) {
     project.admin_review_required = true;
   }
+
+  applyXpdProjectMetadata(project);
 
   return project;
 }
@@ -237,6 +265,8 @@ export function applyManualOverrideFlags(project, overrideReason) {
     applyXpdCaptureDefaults(project);
   }
 
+  applyXpdProjectMetadata(project);
+
   return project;
 }
 
@@ -245,7 +275,10 @@ export function validateManualOverride({ fieldUser, overrideReason, projectAddre
   if (!fieldUser?.trim()) errors.push('Field user is required for manual override.');
   if (!overrideReason) errors.push('Override reason is required.');
   if (!projectAddress?.trim()) errors.push('Project address is required.');
-  if (!servicePathway) errors.push('Service pathway is required.');
+  if (!servicePathway) errors.push('XPD documentation package is required.');
+  if (servicePathway && !isXpdPathway(servicePathway)) {
+    errors.push('Manual override supports XPD documentation packages only in v1.0.');
+  }
   return errors;
 }
 
@@ -332,7 +365,8 @@ export function buildGovernanceBannerHtml(project) {
         <div class="gov-line"><span class="gov-label">ClientFlow Request ID:</span> ${escapeHtml(project.clientflow_request_id || '—')}</div>
         <div class="gov-line"><span class="gov-label">UECS Lite Project ID:</span> ${escapeHtml(project.uecs_project_id || project.project_id || '—')}</div>
         <div class="gov-line"><span class="gov-label">Service Pathway:</span> ${escapeHtml(project.service_pathway || '—')}</div>
-        <div class="gov-line"><span class="gov-label">Documentation Class:</span> ${escapeHtml(project.documentation_control_classification || '—')}</div>
+        <div class="gov-line"><span class="gov-label">Documentation Class:</span> ${escapeHtml(project.documentation_control_classification || DOC_CONTROL_CLASSIFICATION)}</div>
+        <div class="gov-line"><span class="gov-label">Documentation Family:</span> ${escapeHtml(project.documentation_family || 'XPD')}</div>
         <div class="gov-line"><span class="gov-label">Default Capture Method:</span> ${escapeHtml(getDefaultCaptureMethodLabel(project))}</div>
         <div class="gov-line"><span class="gov-label">Selected Enhancements:</span> ${escapeHtml(enhancements)}</div>
         <div class="gov-line"><span class="gov-label">Admin Review Required:</span> ${project.admin_review_required !== false ? 'YES' : 'NO'}</div>

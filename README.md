@@ -1,9 +1,10 @@
-# EAS Field Capture QCM v1.0
+# XPD Field Capture QCM v1.0
 
-**EAS | UECS Field Capture + QCM Intake System**  
-**XPD Field Capture + QCM Intake**
+**XPD Field Capture QCM | UECS Lite Intake System**
 
-Phase 1 phone-first PWA for field documentation quality control. Guides field users through project intake, required shot lists, phone camera capture, per-image QCM scoring, coverage tracking, and structured export for admin review.
+Phase 1 phone-first PWA for **XPD documentation packages only**. Guides field users through UECS Lite project intake, required shot lists, phone camera capture, per-image QCM scoring, coverage tracking, and structured export for admin review.
+
+> **Version 1.0 scope:** Field Capture QCM is intentionally limited to XPD and UECS Lite workflows. Enterprise documentation levels (EAS/EDIS, Levels I–V, spatial, inspection, LiDAR, controlled evidence, etc.) will be implemented in a future Enterprise capture module.
 
 > This system supports visual and spatial documentation quality control only. QCM results evaluate image clarity, coverage, metadata, and documentation readiness. QCM does not provide engineering opinions, inspection conclusions, code compliance determinations, damage diagnosis, or repair recommendations.
 
@@ -66,8 +67,8 @@ Open `index.html` with a local server extension. Do **not** open the file direct
 ## How to Start a Project
 
 1. Tap **Start Field Capture**.
-2. Complete **Project Intake** (client, address, field user, pathway).
-3. Select a **Service Pathway** (XPD or EAS level).
+2. Complete **Project Intake** (client, address, field user, XPD package).
+3. Select an **XPD Documentation Package** (or import from UECS Lite / ClientFlow).
 4. Review the auto-generated **Shot List Dashboard**.
 5. Tap **Capture Required Shot** for each zone.
 6. After each capture, tap **Run QCM**, then **Accept Image** or **Retake Image**.
@@ -77,19 +78,18 @@ Open `index.html` with a local server extension. Do **not** open the file direct
 
 ---
 
-## Service Pathways
+## XPD Documentation Packages (v1.0)
 
-| Pathway | Target Images |
-|---------|---------------|
-| XPD Storm Snapshot | 15–30 |
-| XPD Exterior Baseline Snapshot | 25–45 |
-| XPD Exterior Property Record | 45–75 |
-| XPD Exterior + Aerial Baseline | 25–45 (aerial placeholder) |
-| EAS Level I Baseline Documentation | 50–100 |
-| EAS Level II Inspection Documentation | 75–150 |
-| EAS Level III Spatial Documentation | 100+ |
+| Package | Target Images | Doc Control |
+|---------|---------------|-------------|
+| XPD StormReady Residential – Pre-Storm Baseline | 25–45 | UECS Lite |
+| XPD StormReady Residential – Post-Storm Comparison | 20–40 | UECS Lite |
+| XPD Storm Snapshot | 15–30 | UECS Lite |
+| XPD Exterior Baseline Snapshot | 25–45 | UECS Lite |
+| XPD Exterior Property Record | 45–75 | UECS Lite |
+| XPD Exterior + Aerial Baseline | 25–45 | UECS Lite |
 
-Documentation control defaults: XPD → UECS-Lite; EAS Level I/II/III → UECS-S.
+Every project sets `documentation_family: "XPD"` and `documentation_control_classification: "UECS Lite"`.
 
 ---
 
