@@ -146,6 +146,12 @@ export async function saveExportRecord(record) {
   await promisifyRequest(transaction.objectStore('exports').put(record));
 }
 
+export async function getProjectExports(projectId) {
+  const transaction = await tx('exports');
+  const all = await promisifyRequest(transaction.objectStore('exports').getAll());
+  return all.filter((r) => r.project_id === projectId);
+}
+
 export async function saveUecsLiteQueueRecord(record) {
   const transaction = await tx('uecs_lite_queue', 'readwrite');
   await promisifyRequest(transaction.objectStore('uecs_lite_queue').put(record));

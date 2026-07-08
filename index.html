@@ -127,7 +127,7 @@
           <div class="card-header">Project Auto-Load</div>
           <span class="card-tag">UECS Lite</span>
         </div>
-        <p class="card-lead">Import a UECS Lite project packet to auto-fill client and site details before capture.</p>
+        <p class="card-lead">Import a UECS Lite project packet to auto-fill client and site details before capture. UECS Lite import is the preferred project start method.</p>
         <input type="file" id="project-import-file" class="hidden" accept="application/json,.json">
         <button id="btn-import-project" class="btn btn-secondary">
           <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M10 13V3M10 13l-4-4M10 13l4-4M3 15v1a1 1 0 001 1h12a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -151,6 +151,8 @@
         <p class="screen-subtitle">Establish project context before field capture begins.</p>
       </div>
       <div id="intake-autofill-status"></div>
+      <div id="intake-governance-banner"></div>
+      <div id="intake-capture-method-display"></div>
 
       <form id="intake-form" class="form-stack">
         <div class="card">
@@ -221,13 +223,20 @@
             </select>
           </div>
           <div id="aerial-section" class="hidden">
-            <label class="form-section-label">Aerial Status (Phase 1 Placeholder)</label>
-            <div class="option-list">
-              <label class="option-item"><input type="radio" name="aerial_status" value="pending"> Aerial capture pending</label>
-              <label class="option-item"><input type="radio" name="aerial_status" value="not_required" checked> Aerial not required</label>
-              <label class="option-item"><input type="radio" name="aerial_status" value="separate"> Aerial captured separately</label>
-              <label class="option-item"><input type="radio" name="aerial_status" value="ground_only"> Ground-only package</label>
-            </div>
+            <label class="form-section-label">Aerial Documentation Status</label>
+            <div id="aerial-status-options" class="option-list"></div>
+            <div id="aerial-not-approved-notice" class="hidden"></div>
+          </div>
+        </div>
+
+        <div id="manual-override-section" class="card hidden">
+          <div class="card-header">Manual Override</div>
+          <div class="alert alert-warning" id="manual-override-warning"></div>
+          <div class="form-group">
+            <label for="override-reason">Override Reason <span class="required">*</span></label>
+            <select id="override-reason" class="form-control">
+              <option value="">Select override reason…</option>
+            </select>
           </div>
         </div>
 
@@ -290,6 +299,7 @@
 
     <!-- Dashboard -->
     <section id="screen-dashboard" class="screen">
+      <div id="dash-governance-banner"></div>
       <div class="dash-hero card card-elevated">
         <div class="dash-hero-top">
           <div>
@@ -319,8 +329,8 @@
       <!-- Simple Field Method (XPD Exterior Baseline) -->
       <div id="sfm-dashboard" class="card card-elevated hidden">
         <div class="card-header-row">
-          <div class="card-header" id="sfm-method-name">Simple Field Method</div>
-          <span class="card-tag card-tag-gold">XPD Ground</span>
+          <div class="card-header" id="sfm-method-name">Field Capture QCM</div>
+          <span class="card-tag card-tag-gold">Simple Field Method</span>
         </div>
         <p id="sfm-method-desc" class="card-lead"></p>
         <p id="sfm-guidance" class="guidance-panel"></p>
@@ -630,11 +640,15 @@
       </div>
 
       <div id="final-readiness" class="readiness-banner incomplete"></div>
+      <div id="final-governance-banner"></div>
+      <div id="final-capture-method-display"></div>
+      <div id="final-export-lock"></div>
       <div id="final-warning"></div>
       <div id="final-summary"></div>
 
       <div class="btn-group">
-        <button class="btn btn-success" data-nav="export">Export Project Packet</button>
+        <button id="btn-final-export" class="btn btn-success" data-nav="export">Export Project Packet</button>
+        <button id="btn-final-complete" class="btn btn-success hidden" disabled>Project Complete</button>
         <button class="btn btn-primary" data-nav="capture">Continue Capture</button>
         <button class="btn btn-ghost" data-nav="screen-dashboard">Back to Dashboard</button>
       </div>
@@ -662,6 +676,7 @@
       <div class="card">
         <div class="card-header">UECS Lite Delivery</div>
         <p class="card-lead">Queue the field packet on this device for UECS Lite sync. The queued packet uses the same JSON payload as export.</p>
+        <div class="alert alert-info" id="uecs-lite-clarification">Queued locally for UECS Lite sync. This does not upload in Phase 1. Export files must still be transferred to admin.</div>
         <div id="uecs-queue-status"></div>
       </div>
 

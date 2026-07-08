@@ -36,10 +36,14 @@ export const AERIAL_PATHWAYS = [
 ];
 
 export const AERIAL_STATUS_OPTIONS = [
-  { value: 'pending', label: 'Aerial capture pending' },
-  { value: 'not_required', label: 'Aerial not required' },
-  { value: 'separate', label: 'Aerial captured separately' },
-  { value: 'ground_only', label: 'Ground-only package' },
+  { value: 'not_requested', label: 'Not requested' },
+  { value: 'requested', label: 'Requested' },
+  { value: 'pending_airspace_review', label: 'Pending airspace review' },
+  { value: 'pending_client_authorization', label: 'Pending client authorization' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'unavailable_or_not_approved', label: 'Unavailable or not approved' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 export const ANGLE_TYPES = ['Wide Context', 'Standard', 'Closeup', 'Detail', 'Overview'];

@@ -37,7 +37,7 @@ export const PATHWAY_CONFIG = {
   },
   [SERVICE_PATHWAYS.XPD_BASELINE]: {
     targetMin: 25,
-    targetMax: 40,
+    targetMax: 45,
     controlledMax: 45,
     documentationLevel: 'XPD Exterior Baseline Snapshot',
     captureMethod: 'simple_field_method',

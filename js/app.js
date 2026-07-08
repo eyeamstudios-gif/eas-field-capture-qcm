@@ -59,6 +59,29 @@ import { runQcmAnalysis, computeCoverageSummary, computeProjectQcmSummary } from
 import { CameraCapture, createFileInputCapture } from './camera.js';
 import { buildProjectPacket, exportProject } from './export.js';
 import {
+  validateUecsLiteImport,
+  applyXpdCaptureDefaults,
+  applyAerialFallback,
+  applyManualOverrideFlags,
+  validateManualOverride,
+  buildGovernanceBannerHtml,
+  buildCaptureMethodDisplayHtml,
+  applyFieldQcmStatus,
+  applyExportCompleted,
+  isProjectExportComplete,
+  isXpdPathway,
+  isLinkedToClientFlow,
+  IMPORT_INCOMPLETE_MESSAGE,
+  MANUAL_OVERRIDE_WARNING,
+  AERIAL_NOT_APPROVED_MESSAGE,
+  EXPORT_REQUIRED_MESSAGE,
+  UECS_LITE_QUEUE_MESSAGE,
+  OVERRIDE_REASONS,
+  AERIAL_STATUSES,
+  DEFAULT_CAPTURE_METHOD,
+  DEFAULT_CAPTURE_METHOD_LABEL,
+} from './governance.js';
+import {
   usesSimpleFieldMethod,
   initSimpleFieldMethod,
   updateSimpleFieldProgress,
@@ -100,6 +123,7 @@ const state = {
   selectedViewId: null,
   replacementTargetId: null,
   importedProjectSource: null,
+  pendingImportProject: null,
   homeProjects: [],
 };
 
@@ -114,6 +138,8 @@ async function init() {
 
     bindEvents();
     populatePathwaySelect();
+    populateAerialStatusOptions();
+    populateOverrideReasons();
     setupMobileOptimizations();
     populateHomeNotice();
     await loadHomeScreen();
@@ -188,6 +214,7 @@ function bindEvents() {
 
   $('#btn-start-project')?.addEventListener('click', () => {
     resetIntakeForm();
+    updateManualOverrideSection();
     showScreen('screen-intake');
   });
   $('#btn-import-project')?.addEventListener('click', () => $('#project-import-file')?.click());
@@ -284,6 +311,66 @@ function getCoverage() {
   return computeCoverageSummary(state.project, state.images, state.shotList, state.sfm);
 }
 
+function populateAerialStatusOptions() {
+  const container = $('#aerial-status-options');
+  if (!container) return;
+  container.innerHTML = AERIAL_STATUSES.map(
+    (s, i) =>
+      `<label class="option-item"><input type="radio" name="aerial_status" value="${escapeHtml(s.value)}" ${i === 0 ? 'checked' : ''}> ${escapeHtml(s.label)}</label>`
+  ).join('');
+}
+
+function populateOverrideReasons() {
+  const select = $('#override-reason');
+  if (!select) return;
+  select.innerHTML =
+    '<option value="">Select override reason…</option>' +
+    OVERRIDE_REASONS.map((r) => `<option value="${escapeHtml(r.value)}">${escapeHtml(r.label)}</option>`).join('');
+}
+
+function renderGovernanceBanner(targetId, project) {
+  const el = $(targetId);
+  if (!el || !project) {
+    if (el) el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = buildGovernanceBannerHtml(project);
+}
+
+function renderCaptureMethodDisplay(targetId, project) {
+  const el = $(targetId);
+  if (!el || !project) {
+    if (el) el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = buildCaptureMethodDisplayHtml(project);
+}
+
+function updateManualOverrideSection() {
+  const section = $('#manual-override-section');
+  const warning = $('#manual-override-warning');
+  if (!section) return;
+
+  const isManual = !state.importedProjectSource;
+  section.classList.toggle('hidden', !isManual);
+  if (warning && isManual) {
+    warning.textContent = MANUAL_OVERRIDE_WARNING;
+  }
+}
+
+function updateAerialNotApprovedNotice(project) {
+  const notice = $('#aerial-not-approved-notice');
+  if (!notice) return;
+
+  if (project?.aerial_not_approved || project?.aerial_status === 'unavailable_or_not_approved') {
+    notice.innerHTML = `<div class="alert alert-warning">${escapeHtml(AERIAL_NOT_APPROVED_MESSAGE)}</div>`;
+    notice.classList.remove('hidden');
+  } else {
+    notice.innerHTML = '';
+    notice.classList.add('hidden');
+  }
+}
+
 function populatePathwaySelect() {
   const select = $('#pathway-select');
   if (!select) return;
@@ -300,20 +387,47 @@ function resetIntakeForm() {
   if (!form) return;
   form.reset();
   state.importedProjectSource = null;
+  state.pendingImportProject = null;
   $('#intake-autofill-status').innerHTML = '';
+  $('#intake-governance-banner').innerHTML = '';
+  $('#intake-capture-method-display').innerHTML = '';
   $('#project-date').value = formatDate();
   $('#doc-control').value = PATHWAY_DOC_CONTROL[SERVICE_PATHWAYS.XPD_BASELINE];
+  updateManualOverrideSection();
+  onPathwayChange();
 }
 
 function onPathwayChange() {
   const pathway = $('#pathway-select').value;
-  $('#doc-control').value = PATHWAY_DOC_CONTROL[pathway] || 'UECS-S';
+  $('#doc-control').value = PATHWAY_DOC_CONTROL[pathway] || 'UECS-Lite';
   const aerialSection = $('#aerial-section');
   if (AERIAL_PATHWAYS.includes(pathway)) {
     aerialSection?.classList.remove('hidden');
   } else {
     aerialSection?.classList.add('hidden');
   }
+
+  const draftProject = {
+    service_pathway: pathway,
+    documentation_control_classification: $('#doc-control').value,
+    default_capture_method: isXpdPathway(pathway) ? DEFAULT_CAPTURE_METHOD : null,
+    field_capture_qcm: isXpdPathway(pathway),
+    admin_review_required: true,
+    aerial_documentation: AERIAL_PATHWAYS.includes(pathway),
+    enhanced_camera_capture: false,
+    reference_360_capture: false,
+    verified_location_capture: false,
+    spatial_record_capture: false,
+    clientflow_request_id: state.importedProjectSource?.clientflow_request_id || null,
+    uecs_project_id: state.importedProjectSource?.uecs_project_id || null,
+    linked_to_clientflow: !!state.importedProjectSource,
+  };
+
+  if (isXpdPathway(pathway)) {
+    applyXpdCaptureDefaults(draftProject);
+  }
+
+  renderCaptureMethodDisplay('#intake-capture-method-display', draftProject);
 }
 
 async function handleProjectImport(e) {
@@ -324,7 +438,15 @@ async function handleProjectImport(e) {
   try {
     const raw = await file.text();
     const data = JSON.parse(raw);
-    const project = normalizeImportedProject(data);
+    const result = validateUecsLiteImport(data);
+
+    if (!result.valid) {
+      statusEl.innerHTML = `<div class="alert alert-warning">${escapeHtml(IMPORT_INCOMPLETE_MESSAGE)}</div>`;
+      return;
+    }
+
+    const project = result.project;
+    state.pendingImportProject = project;
 
     resetIntakeForm();
     populateIntakeForm(project);
@@ -335,9 +457,19 @@ async function handleProjectImport(e) {
       clientflow_request_id: project.clientflow_request_id || null,
       uecs_project_id: project.uecs_project_id || project.project_id || null,
     };
+    state.pendingImportProject = null;
 
-    statusEl.innerHTML = `<div class="alert alert-info">Loaded project info from ${escapeHtml(file.name)}. Review details, then create the field capture.</div>`;
-    $('#intake-autofill-status').innerHTML = `<div class="alert alert-info">Project details auto-loaded from ${escapeHtml(file.name)}.</div>`;
+    renderGovernanceBanner('#intake-governance-banner', project);
+    renderCaptureMethodDisplay('#intake-capture-method-display', project);
+    updateManualOverrideSection();
+    updateAerialNotApprovedNotice(project);
+
+    let statusHtml = `<div class="alert alert-info">Loaded project info from ${escapeHtml(file.name)}. Review details, then create the field capture.</div>`;
+    if (result.warnings.length) {
+      statusHtml += result.warnings.map((w) => `<div class="alert alert-warning">${escapeHtml(w)}</div>`).join('');
+    }
+    statusEl.innerHTML = statusHtml;
+    $('#intake-autofill-status').innerHTML = statusHtml;
     showScreen('screen-intake');
   } catch (err) {
     console.error(err);
@@ -345,47 +477,6 @@ async function handleProjectImport(e) {
   } finally {
     e.target.value = '';
   }
-}
-
-function normalizeImportedProject(data) {
-  const source = data.project || data.project_info || data;
-  if (!source || typeof source !== 'object') {
-    throw new Error('Project import must be a JSON object.');
-  }
-
-  const project = {
-    project_id: source.project_id || data.uecs_project_id || source.uecs_project_id || '',
-    client_name: source.client_name || source.client?.name || '',
-    client_company: source.client_company || source.client?.company || '',
-    client_email: source.client_email || source.client?.email || '',
-    client_phone: source.client_phone || source.client?.phone || '',
-    project_address: source.project_address || source.address || source.site_address || '',
-    city: source.city || source.site_city || '',
-    state: source.state || source.site_state || '',
-    zip: source.zip || source.postal_code || source.site_zip || '',
-    service_pathway: source.service_pathway || data.service_pathway || SERVICE_PATHWAYS.XPD_BASELINE,
-    documentation_level: source.documentation_level || data.documentation_level || '',
-    documentation_control_classification:
-      source.documentation_control_classification ||
-      data.documentation_control_classification ||
-      'UECS-Lite',
-    field_user: source.field_user || '',
-    date: source.date || formatDate(),
-    weather: source.weather || '',
-    site_access_notes: source.site_access_notes || source.access_notes || '',
-    purpose: source.purpose || source.documentation_purpose || '',
-    client_notes: source.client_notes || '',
-    internal_notes: source.internal_notes || '',
-    aerial_status: source.aerial_status || null,
-    clientflow_request_id: source.clientflow_request_id || data.clientflow_request_id || null,
-    uecs_project_id: source.uecs_project_id || data.uecs_project_id || source.project_id || '',
-  };
-
-  if (!project.client_name || !project.project_address) {
-    throw new Error('Project import needs at least client_name and project_address.');
-  }
-
-  return project;
 }
 
 function populateIntakeForm(project) {
@@ -425,11 +516,29 @@ function populateIntakeForm(project) {
     const aerial = $$('input[name="aerial_status"]').find((el) => el.value === project.aerial_status);
     if (aerial) aerial.checked = true;
   }
+
+  renderGovernanceBanner('#intake-governance-banner', project);
+  renderCaptureMethodDisplay('#intake-capture-method-display', project);
+  updateAerialNotApprovedNotice(project);
 }
 
 async function handleIntakeSubmit(e) {
   e.preventDefault();
   const pathway = $('#pathway-select').value;
+  const isManualStart = !state.importedProjectSource;
+
+  if (isManualStart) {
+    const overrideErrors = validateManualOverride({
+      fieldUser: $('#field-user').value,
+      overrideReason: $('#override-reason')?.value,
+      projectAddress: $('#project-address').value,
+      servicePathway: pathway,
+    });
+    if (overrideErrors.length) {
+      alert(overrideErrors.join('\n'));
+      return;
+    }
+  }
 
   const project = {
     project_id: $('#project-id').value.trim() || generateId('proj'),
@@ -452,15 +561,42 @@ async function handleIntakeSubmit(e) {
     client_notes: $('#client-notes').value.trim(),
     internal_notes: $('#internal-notes').value.trim(),
     aerial_status: AERIAL_PATHWAYS.includes(pathway) ? $('input[name="aerial_status"]:checked')?.value : null,
+    aerial_documentation: AERIAL_PATHWAYS.includes(pathway),
+    enhanced_camera_capture: false,
+    reference_360_capture: false,
+    verified_location_capture: false,
+    spatial_record_capture: false,
     created_at: formatDateTime(),
     updated_at: formatDateTime(),
     clientflow_request_id: state.importedProjectSource?.clientflow_request_id || null,
     uecs_project_id: state.importedProjectSource?.uecs_project_id || null,
+    linked_to_clientflow: isLinkedToClientFlow({ clientflow_request_id: state.importedProjectSource?.clientflow_request_id }),
     import_source: state.importedProjectSource,
+    import_method: state.importedProjectSource ? 'uecs_lite' : 'manual_override',
     uecs_delivery_status: 'not_queued',
+    default_capture_method: isXpdPathway(pathway) ? DEFAULT_CAPTURE_METHOD : null,
+    field_capture_qcm: isXpdPathway(pathway),
+    admin_review_required: true,
+    field_export_required: true,
+    field_export_completed: false,
+    ready_for_admin_review: false,
+    qcm_status: 'field_capture_in_progress',
+    review_status: 'field_capture',
   };
 
   project.uecs_project_id = project.uecs_project_id || project.project_id;
+
+  if (isXpdPathway(pathway)) {
+    applyXpdCaptureDefaults(project);
+  }
+
+  if (AERIAL_PATHWAYS.includes(pathway)) {
+    applyAerialFallback(project);
+  }
+
+  if (isManualStart) {
+    applyManualOverrideFlags(project, $('#override-reason').value);
+  }
 
   state.project = project;
   state.shotList = generateShotList(pathway);
@@ -627,6 +763,13 @@ async function loadProject(projectId) {
   const project = await getProject(projectId);
   if (!project) return;
 
+  if (isXpdPathway(project.service_pathway)) {
+    applyXpdCaptureDefaults(project);
+  }
+  if (project.aerial_documentation) {
+    applyAerialFallback(project);
+  }
+
   state.project = project;
   const shotStatus = await getShotListStatus(projectId);
   state.shotList = shotStatus?.shotList || generateShotList(project.service_pathway);
@@ -645,6 +788,9 @@ async function loadProject(projectId) {
 
 function renderDashboard() {
   if (!state.project || !state.shotList) return;
+
+  renderGovernanceBanner('#dash-governance-banner', state.project);
+  updateAerialNotApprovedNotice(state.project);
 
   $('#dash-project-id').textContent = state.project.project_id;
   $('#dash-pathway').textContent = state.project.service_pathway;
@@ -1460,31 +1606,75 @@ function renderFinalReview() {
   if (state.sfm) state.sfm = updateSimpleFieldProgress(state.sfm, state.images);
   const coverage = getCoverage();
   const qcm = computeProjectQcmSummary(state.images);
+  const exportComplete = isProjectExportComplete(state.project);
+
+  applyFieldQcmStatus(state.project, coverage.readiness === 'READY_FOR_ADMIN_REVIEW');
+
+  renderGovernanceBanner('#final-governance-banner', state.project);
+  renderCaptureMethodDisplay('#final-capture-method-display', state.project);
 
   $('#final-readiness').textContent = readinessLabel(coverage.readiness);
   $('#final-readiness').className = `readiness-banner ${readinessClass(coverage.readiness)}`;
 
+  const exportLockEl = $('#final-export-lock');
+  const completeBtn = $('#btn-final-complete');
+  const exportBtn = $('#btn-final-export');
+
+  if (exportComplete) {
+    exportLockEl.innerHTML = `<div class="final-complete-badge">Export complete — Ready for admin QCM review</div>
+      <div class="alert alert-info">Field QCM does not equal final approval. Admin QCM is required before client release.</div>`;
+    completeBtn?.classList.remove('hidden');
+    completeBtn.disabled = false;
+    exportBtn?.classList.add('hidden');
+  } else {
+    exportLockEl.innerHTML = `<div class="export-lock-notice alert alert-warning">${escapeHtml(EXPORT_REQUIRED_MESSAGE)}</div>
+      <div class="alert alert-info">Field QCM does not equal final approval. Admin QCM is required before client release.</div>`;
+    completeBtn?.classList.add('hidden');
+    completeBtn.disabled = true;
+    exportBtn?.classList.remove('hidden');
+  }
+
+  if (state.project.aerial_not_approved) {
+    exportLockEl.innerHTML += `<div class="alert alert-warning">${escapeHtml(AERIAL_NOT_APPROVED_MESSAGE)}</div>`;
+  }
+
+  if (state.project.is_test_project) {
+    exportLockEl.innerHTML += `<div class="test-watermark">TEST / INTERNAL REVIEW — NOT FOR CLIENT DELIVERY</div>`;
+  }
+
   $('#final-summary').innerHTML = `
     <div class="card">
-      <div class="card-header">Project Summary</div>
+      <div class="card-header">Documentation Readiness Summary</div>
       <p><strong>Project:</strong> ${escapeHtml(state.project.project_id)}</p>
-      <p><strong>Pathway:</strong> ${escapeHtml(state.project.service_pathway)}</p>
+      <p><strong>Service Pathway:</strong> ${escapeHtml(state.project.service_pathway)}</p>
+      <p><strong>Default Capture Method:</strong> ${escapeHtml(state.project.default_capture_method === DEFAULT_CAPTURE_METHOD ? DEFAULT_CAPTURE_METHOD_LABEL : state.project.default_capture_method || DEFAULT_CAPTURE_METHOD_LABEL)}</p>
       <p><strong>Documentation Control:</strong> ${escapeHtml(state.project.documentation_control_classification)}</p>
       <p><strong>Accepted Images:</strong> ${coverage.accepted} (target ${coverage.targetMin}–${coverage.targetMax})</p>
       <p><strong>Required Zones:</strong> ${coverage.requiredZonesComplete} / ${coverage.requiredZonesTotal}</p>
       <p><strong>Average QCM Score:</strong> ${qcm.average_score} / 100</p>
       <p><strong>Warnings:</strong> ${coverage.warnings} | <strong>Retakes:</strong> ${coverage.retakes}</p>
-      <p><strong>Package Readiness:</strong> ${coverage.packageReadiness}%</p>
+      <p><strong>Documentation Readiness:</strong> ${coverage.packageReadiness}%</p>
+      <p><strong>QCM Status:</strong> ${escapeHtml(state.project.qcm_status || 'field_qcm_completed')}</p>
+      <p><strong>Review Status:</strong> ${escapeHtml(state.project.review_status || 'qcm_pending')}</p>
+      <p><strong>Admin Review Required:</strong> ${state.project.admin_review_required !== false ? 'YES' : 'NO'}</p>
+      <p><strong>Field Export:</strong> ${exportComplete ? 'Completed' : 'Required'}</p>
       <p>${escapeHtml(coverage.statusMessage)}</p>
     </div>`;
 
   if (coverage.readiness !== 'READY_FOR_ADMIN_REVIEW') {
     $('#final-warning').innerHTML = `<div class="alert alert-warning">${escapeHtml(coverage.statusMessage)}</div>`;
+  } else if (!exportComplete) {
+    $('#final-warning').innerHTML = `<div class="alert alert-warning">Documentation Readiness met — export required before project completion.</div>`;
   } else {
-    $('#final-warning').innerHTML = `<div class="alert alert-info">Package meets minimum requirements for admin review.</div>`;
+    $('#final-warning').innerHTML = `<div class="alert alert-info">Package meets minimum requirements for admin QCM review.</div>`;
   }
 
   showScreen('screen-final');
+
+  if (state.project) {
+    state.project.updated_at = formatDateTime();
+    saveProject(state.project).catch(console.error);
+  }
 }
 
 function renderExportScreen() {
@@ -1522,17 +1712,23 @@ async function handleExport() {
     const coverage = result.coverage;
     if (coverage.overcapture?.adminReviewRequired) {
       state.project.admin_review_required = true;
-      await saveProject(state.project);
     }
+
+    applyFieldQcmStatus(state.project, coverage.readiness === 'READY_FOR_ADMIN_REVIEW');
+    applyExportCompleted(state.project);
+    state.project.updated_at = formatDateTime();
+    await saveProject(state.project);
+
     await saveExportRecord({
       export_id: result.export_id,
       project_id: state.project.project_id,
       export_timestamp: result.export_timestamp,
       files: result.files,
       readiness: result.coverage.readiness,
+      export_complete: true,
     });
 
-    $('#export-status').innerHTML = `<div class="alert alert-info">Export complete. ${result.files.length} files downloaded.<br>Status: ${readinessLabel(result.coverage.readiness)}</div>`;
+    $('#export-status').innerHTML = `<div class="alert alert-info">Export complete. ${result.files.length} files downloaded.<br>Status: ${readinessLabel(result.coverage.readiness)}<br>Ready for admin QCM review. Transfer export files to admin.</div>`;
     showToast(`Export complete — ${result.files.length} files`, 'success');
   } catch (err) {
     console.error(err);
@@ -1570,7 +1766,7 @@ async function handleSendToUecsLite() {
     state.project.updated_at = formatDateTime();
     await saveProject(state.project);
 
-    $('#export-status').innerHTML = `<div class="alert alert-info">UECS Lite packet queued locally. It will remain on this device until the UECS Lite sync endpoint is connected.</div>`;
+    $('#export-status').innerHTML = `<div class="alert alert-info">${escapeHtml(UECS_LITE_QUEUE_MESSAGE)}</div>`;
     await renderUecsQueueStatus();
   } catch (err) {
     console.error(err);

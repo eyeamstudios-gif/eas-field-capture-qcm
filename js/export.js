@@ -14,6 +14,7 @@ import {
 import { computeCoverageSummary, computeProjectQcmSummary } from './qcm.js';
 import { getMissingZones } from './shotlists.js';
 import { usesSimpleFieldMethod, buildCapturePassesExport } from './simple-field-method.js';
+import { DEFAULT_CAPTURE_METHOD, TEST_WATERMARK } from './governance.js';
 
 export function buildProjectPacket(project, images, shotList, coverage, sfm = null) {
   const qcmSummary = computeProjectQcmSummary(images);
@@ -47,7 +48,24 @@ export function buildProjectPacket(project, images, shotList, coverage, sfm = nu
     review_status: 'qcm_pending',
     qcm_status: 'field_qcm_completed',
     sow_status: 'not_started',
-    delivery_status: 'not_ready',
+    delivery_status: project.field_export_completed ? 'export_ready' : 'not_ready',
+    default_capture_method: project.default_capture_method || DEFAULT_CAPTURE_METHOD,
+    field_capture_qcm: project.field_capture_qcm ?? true,
+    field_export_required: project.field_export_required ?? true,
+    field_export_completed: project.field_export_completed ?? false,
+    ready_for_admin_review: project.ready_for_admin_review ?? false,
+    linked_to_clientflow: project.linked_to_clientflow ?? false,
+    import_method: project.import_method || null,
+    override_reason: project.override_reason || null,
+    is_test_project: project.is_test_project || false,
+    not_for_client_delivery: project.not_for_client_delivery || false,
+    fallback_capture_method: project.fallback_capture_method || null,
+    client_scope_notice_required: project.client_scope_notice_required || false,
+    enhanced_camera_capture: project.enhanced_camera_capture || false,
+    aerial_documentation: project.aerial_documentation || false,
+    reference_360_capture: project.reference_360_capture || false,
+    verified_location_capture: project.verified_location_capture || false,
+    spatial_record_capture: project.spatial_record_capture || false,
     field_capture_complete:
       coverage.readiness === 'READY_FOR_ADMIN_REVIEW' ||
       coverage.readiness === 'SITE_LIMITATION_REVIEW',
@@ -183,6 +201,10 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
     .map((z) => `<li>${escapeHtml(z.name)}</li>`)
     .join('');
 
+  const testWatermark = project.is_test_project
+    ? `<div class="test-watermark">${escapeHtml(TEST_WATERMARK)}</div>`
+    : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -208,9 +230,11 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
     .incomplete { background: #ddf4ff; color: #0969da; }
     .disclaimer { font-size: 0.75rem; color: #666; margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; }
     ul { padding-left: 20px; }
+    .test-watermark { background: repeating-linear-gradient(-45deg, #fff3cd, #fff3cd 10px, #ffe69c 10px, #ffe69c 20px); border: 2px dashed #bf8700; color: #9a6700; font-weight: 700; text-align: center; padding: 12px; margin-bottom: 16px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
+  ${testWatermark}
   <h1>${escapeHtml(SYSTEM_NAME)}</h1>
   <p><strong>${escapeHtml(VERSION)}</strong> — Field Capture Report</p>
 
@@ -219,13 +243,16 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
     <p><strong>Client:</strong> ${escapeHtml(project.client_name)} ${project.client_company ? `(${escapeHtml(project.client_company)})` : ''}</p>
     <p><strong>Address:</strong> ${escapeHtml(project.project_address)}, ${escapeHtml(project.city)} ${escapeHtml(project.state)} ${escapeHtml(project.zip)}</p>
     <p><strong>Service Pathway:</strong> ${escapeHtml(project.service_pathway)}</p>
+    <p><strong>Default Capture Method:</strong> Field Capture QCM</p>
+    <p><strong>Documentation Control:</strong> ${escapeHtml(project.documentation_control_classification)}</p>
+    <p><strong>Admin Review Required:</strong> ${project.admin_review_required !== false ? 'YES' : 'NO'}</p>
     <p><strong>Field User:</strong> ${escapeHtml(project.field_user)}</p>
     <p><strong>Date:</strong> ${escapeHtml(project.date)}</p>
     <p><strong>Export:</strong> ${escapeHtml(formatDateTime())}</p>
   </div>
 
   <div class="readiness ${readinessCss(coverage.readiness)}">
-    Package Status: ${escapeHtml(formatReadiness(coverage.readiness))} (${coverage.packageReadiness}%)
+    Documentation Readiness: ${escapeHtml(formatReadiness(coverage.readiness))} (${coverage.packageReadiness}%)
   </div>
   <p>${escapeHtml(coverage.statusMessage)}</p>
 

@@ -24,10 +24,10 @@ import {
   usableImages as groundUsableImages,
 } from './xpd-ground-capture.js';
 
-export const CAPTURE_METHOD_NAME = 'Simple Field Method';
+export const CAPTURE_METHOD_NAME = 'Field Capture QCM';
 
 export const CAPTURE_METHOD_DESCRIPTION =
-  'A three-pass exterior capture method mapped to Required Core Coverage, Condition/Detail Coverage, and Final QA with optional context review.';
+  'Default XPD capture method with guided shot lists, QCM scoring, and coverage readiness. Includes Simple Field Method workflow for exterior baseline pathways.';
 
 export const SFM_GUIDANCE = GROUND_GUIDANCE;
 

@@ -1918,6 +1918,92 @@ select.form-control {
   margin: 8px 0 0 18px;
 }
 
+/* ── Governance banner ── */
+.governance-banner {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.governance-banner-header {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-gold);
+  margin-bottom: 10px;
+}
+
+.governance-banner-grid {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.gov-line .gov-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.capture-method-display {
+  margin-bottom: 16px;
+}
+
+.capture-method-section-label {
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.capture-enhancement-list {
+  margin: 0 0 8px 18px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.capture-sub-method,
+.capture-fallback,
+.capture-method-note {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 6px 0;
+}
+
+.test-watermark {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(251, 191, 36, 0.15),
+    rgba(251, 191, 36, 0.15) 10px,
+    rgba(251, 191, 36, 0.05) 10px,
+    rgba(251, 191, 36, 0.05) 20px
+  );
+  border: 2px dashed var(--warning-amber);
+  color: var(--warning-amber);
+  font-weight: 700;
+  text-align: center;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+}
+
+.export-lock-notice {
+  margin-bottom: 16px;
+}
+
+.final-complete-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--pass-green-dim);
+  color: var(--pass-green);
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
 /* ── Toast ── */
 .toast-stack {
   position: fixed;
