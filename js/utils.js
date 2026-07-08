@@ -353,24 +353,97 @@ export function readinessLabel(level) {
   return map[level] || level;
 }
 
-export async function getGpsPosition() {
+export async function getGpsPosition(options = {}) {
   if (!navigator.geolocation) return null;
+  const {
+    enableHighAccuracy = true,
+    timeout = 12000,
+    maximumAge = 60000,
+  } = options;
+
   try {
     const pos = await new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 8000,
-        maximumAge: 60000,
+        enableHighAccuracy,
+        timeout,
+        maximumAge,
       });
     });
     return {
       gps_available: true,
       latitude: pos.coords.latitude,
       longitude: pos.coords.longitude,
+      accuracy_m: pos.coords.accuracy ?? null,
+      captured_at: new Date().toISOString(),
     };
-  } catch {
-    return { gps_available: false, latitude: null, longitude: null };
+  } catch (err) {
+    return {
+      gps_available: false,
+      latitude: null,
+      longitude: null,
+      accuracy_m: null,
+      captured_at: null,
+      error: err?.message || 'GPS unavailable',
+    };
   }
+}
+
+function parseNominatimAddress(data) {
+  const addr = data?.address;
+  if (!addr) return null;
+
+  const streetParts = [addr.house_number, addr.road || addr.pedestrian || addr.footway].filter(Boolean);
+  const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || '';
+  const isoRegion = addr['ISO3166-2-lvl4'] || '';
+  const state = isoRegion.includes('-')
+    ? isoRegion.split('-').pop()
+    : addr.state || '';
+  const zip = addr.postcode || '';
+
+  return {
+    project_address: streetParts.length
+      ? streetParts.join(' ')
+      : data.display_name?.split(',')[0] || '',
+    city,
+    state: state.length === 2 ? state.toUpperCase() : state,
+    zip,
+    display_name: data.display_name || '',
+  };
+}
+
+export async function reverseGeocodeGps(latitude, longitude) {
+  if (!navigator.onLine) return null;
+
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse');
+    url.searchParams.set('format', 'json');
+    url.searchParams.set('lat', String(latitude));
+    url.searchParams.set('lon', String(longitude));
+    url.searchParams.set('addressdetails', '1');
+
+    const res = await fetch(url.toString(), {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'en',
+      },
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return parseNominatimAddress(data);
+  } catch {
+    return null;
+  }
+}
+
+export function formatGpsCoordinates(latitude, longitude, accuracyM = null) {
+  const lat = Number(latitude).toFixed(6);
+  const lng = Number(longitude).toFixed(6);
+  const accuracy =
+    accuracyM != null && Number.isFinite(accuracyM)
+      ? ` (±${Math.round(accuracyM)} m)`
+      : '';
+  return `${lat}, ${lng}${accuracy}`;
 }
 
 export function debounce(fn, ms = 300) {

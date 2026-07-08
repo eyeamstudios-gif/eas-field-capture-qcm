@@ -187,6 +187,18 @@
 
         <div class="card">
           <div class="card-header">Site Location</div>
+          <div class="location-actions">
+            <button type="button" id="btn-use-gps-location" class="btn btn-secondary btn-compact">
+              <svg class="btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2v2M10 16v2M2 10h2M16 10h2M5.64 5.64l1.42 1.42M12.94 12.94l1.42 1.42M5.64 14.36l1.42-1.42M12.94 7.06l1.42-1.42M10 7a3 3 0 100 6 3 3 0 000-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              Use Current GPS Location
+            </button>
+          </div>
+          <div id="site-location-status" class="card-footer-slot" aria-live="polite"></div>
+          <input type="hidden" id="site-latitude" value="">
+          <input type="hidden" id="site-longitude" value="">
+          <input type="hidden" id="site-location-source" value="">
+          <input type="hidden" id="site-gps-accuracy" value="">
+          <input type="hidden" id="site-gps-captured-at" value="">
           <div class="form-group">
             <label for="project-address">Project Address <span class="required">*</span></label>
             <input type="text" id="project-address" class="form-control" required>

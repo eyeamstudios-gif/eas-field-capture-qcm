@@ -30,6 +30,8 @@ import {
   readinessClass,
   readinessLabel,
   getGpsPosition,
+  reverseGeocodeGps,
+  formatGpsCoordinates,
 } from './utils.js';
 
 import {
@@ -232,6 +234,10 @@ function bindEvents() {
 
   $('#intake-form')?.addEventListener('submit', handleIntakeSubmit);
   $('#pathway-select')?.addEventListener('change', onPathwayChange);
+  $('#btn-use-gps-location')?.addEventListener('click', handleUseCurrentGpsLocation);
+  ['#project-address', '#city', '#state', '#zip'].forEach((selector) => {
+    $(selector)?.addEventListener('input', clearSiteLocationGpsOnManualEdit);
+  });
   $('#btn-back-home')?.addEventListener('click', () => showScreen('screen-home'));
   $('#btn-save-pathway')?.addEventListener('click', handlePathwaySave);
 
@@ -384,6 +390,105 @@ function populatePathwaySelect() {
     .join('');
 }
 
+function clearSiteLocationGpsFields() {
+  ['#site-latitude', '#site-longitude', '#site-location-source', '#site-gps-accuracy', '#site-gps-captured-at'].forEach(
+    (selector) => {
+      const el = $(selector);
+      if (el) el.value = '';
+    }
+  );
+  const status = $('#site-location-status');
+  if (status) status.innerHTML = '';
+}
+
+function clearSiteLocationGpsOnManualEdit() {
+  const source = $('#site-location-source')?.value;
+  if (source === 'gps_current') {
+    clearSiteLocationGpsFields();
+    const status = $('#site-location-status');
+    if (status) {
+      status.innerHTML =
+        '<div class="alert alert-info">Address edited manually. GPS capture metadata cleared.</div>';
+    }
+  }
+}
+
+function setSiteLocationGpsFields({ latitude, longitude, accuracy_m, captured_at, source = 'gps_current' }) {
+  const set = (selector, value) => {
+    const el = $(selector);
+    if (el) el.value = value ?? '';
+  };
+  set('#site-latitude', latitude);
+  set('#site-longitude', longitude);
+  set('#site-location-source', source);
+  set('#site-gps-accuracy', accuracy_m);
+  set('#site-gps-captured-at', captured_at);
+}
+
+function readSiteLocationFields() {
+  return {
+    site_latitude: $('#site-latitude')?.value ? Number($('#site-latitude').value) : null,
+    site_longitude: $('#site-longitude')?.value ? Number($('#site-longitude').value) : null,
+    site_location_source: $('#site-location-source')?.value || null,
+    site_gps_accuracy_m: $('#site-gps-accuracy')?.value ? Number($('#site-gps-accuracy').value) : null,
+    site_gps_captured_at: $('#site-gps-captured-at')?.value || null,
+  };
+}
+
+async function handleUseCurrentGpsLocation() {
+  const btn = $('#btn-use-gps-location');
+  const statusEl = $('#site-location-status');
+  if (!btn || !statusEl) return;
+
+  btn.disabled = true;
+  statusEl.innerHTML = '<div class="alert alert-info">Acquiring GPS location… Allow location access if prompted.</div>';
+
+  try {
+    const gps = await getGpsPosition({ enableHighAccuracy: true, timeout: 15000 });
+    if (!gps?.gps_available) {
+      statusEl.innerHTML = `<div class="alert alert-warning">GPS unavailable. ${escapeHtml(
+        gps?.error || 'Enable location permissions and try again.'
+      )}</div>`;
+      showToast('Could not get GPS location', 'warning');
+      return;
+    }
+
+    const geocoded = await reverseGeocodeGps(gps.latitude, gps.longitude);
+    const coordLabel = formatGpsCoordinates(gps.latitude, gps.longitude, gps.accuracy_m);
+
+    if (geocoded?.project_address) {
+      $('#project-address').value = geocoded.project_address;
+      if (geocoded.city) $('#city').value = geocoded.city;
+      if (geocoded.state) $('#state').value = geocoded.state.length === 2 ? geocoded.state.toUpperCase() : geocoded.state;
+      if (geocoded.zip) $('#zip').value = geocoded.zip;
+      statusEl.innerHTML = `<div class="alert alert-info">Site location set from current GPS: ${escapeHtml(
+        coordLabel
+      )}${geocoded.display_name ? `<br><span class="text-muted">${escapeHtml(geocoded.display_name)}</span>` : ''}</div>`;
+      showToast('GPS location applied', 'success');
+    } else {
+      $('#project-address').value = `GPS: ${coordLabel}`;
+      statusEl.innerHTML = `<div class="alert alert-info">GPS coordinates captured: ${escapeHtml(
+        coordLabel
+      )}. Street address could not be resolved offline — you can edit the address fields manually.</div>`;
+      showToast('GPS coordinates captured', 'info');
+    }
+
+    setSiteLocationGpsFields({
+      latitude: gps.latitude,
+      longitude: gps.longitude,
+      accuracy_m: gps.accuracy_m,
+      captured_at: gps.captured_at,
+      source: 'gps_current',
+    });
+  } catch (err) {
+    console.error(err);
+    statusEl.innerHTML = `<div class="alert alert-warning">GPS failed: ${escapeHtml(err.message)}</div>`;
+    showToast('GPS location failed', 'warning');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function resetIntakeForm() {
   const form = $('#intake-form');
   if (!form) return;
@@ -397,6 +502,7 @@ function resetIntakeForm() {
   $('#doc-control').value = DOC_CONTROL_CLASSIFICATION;
   $('#stormready-eligible').value = '';
   $('#stormready-section')?.classList.add('hidden');
+  clearSiteLocationGpsFields();
   updateManualOverrideSection();
   onPathwayChange();
 }
@@ -529,6 +635,22 @@ function populateIntakeForm(project) {
   setValue('#client-notes', project.client_notes);
   setValue('#internal-notes', project.internal_notes);
 
+  if (project.site_latitude != null && project.site_longitude != null) {
+    setSiteLocationGpsFields({
+      latitude: project.site_latitude,
+      longitude: project.site_longitude,
+      accuracy_m: project.site_gps_accuracy_m,
+      captured_at: project.site_gps_captured_at,
+      source: project.site_location_source || 'gps_current',
+    });
+    const coordLabel = formatGpsCoordinates(
+      project.site_latitude,
+      project.site_longitude,
+      project.site_gps_accuracy_m
+    );
+    $('#site-location-status').innerHTML = `<div class="alert alert-info">Saved site GPS: ${escapeHtml(coordLabel)}</div>`;
+  }
+
   onPathwayChange();
   setValue('#doc-level', project.documentation_level || project.service_pathway);
   setValue('#doc-control', DOC_CONTROL_CLASSIFICATION);
@@ -590,6 +712,7 @@ async function handleIntakeSubmit(e) {
     purpose: $('#purpose').value.trim(),
     client_notes: $('#client-notes').value.trim(),
     internal_notes: $('#internal-notes').value.trim(),
+    ...readSiteLocationFields(),
     aerial_status: AERIAL_PATHWAYS.includes(pathway) ? $('input[name="aerial_status"]:checked')?.value : null,
     aerial_documentation: AERIAL_PATHWAYS.includes(pathway),
     enhanced_camera_capture: false,
