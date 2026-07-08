@@ -1,7 +1,9 @@
-const fs = require('fs-extra');
-const path = require('path');
+import fs from 'fs-extra';
+import path from 'path';
+import { fileURLToPath } from 'node:url';
 
-const root = process.cwd();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(__dirname, '..');
 const dist = path.join(root, 'dist');
 
 fs.removeSync(dist);
@@ -12,7 +14,6 @@ const items = [
   'manifest.webmanifest',
   'service-worker.js',
   'README.md',
-  'css',
   'css',
   'js',
   'assets',

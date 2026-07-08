@@ -1,33 +1,65 @@
-{
-  "name": "XPD Field Capture QCM",
-  "short_name": "XPD Capture",
-  "description": "XPD Field Capture QCM — XPD documentation packages and UECS Lite deliverables only (v1.0)",
-  "start_url": "/",
-  "scope": "/",
-  "display": "standalone",
-  "orientation": "any",
-  "background_color": "#06080c",
-  "theme_color": "#06080c",
-  "categories": ["productivity", "utilities"],
-  "icons": [
-    {
-      "src": "/assets/icons/icon.svg",
-      "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/assets/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/assets/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
-}
-
+{
+
+  "name": "XPD Field Capture QCM",
+
+  "short_name": "XPD Capture",
+
+  "description": "XPD Field Capture QCM — XPD documentation packages and UECS Lite deliverables only (v1.0)",
+
+  "start_url": "/",
+
+  "scope": "/",
+
+  "display": "standalone",
+
+  "orientation": "any",
+
+  "background_color": "#06080c",
+
+  "theme_color": "#06080c",
+
+  "categories": ["productivity", "utilities"],
+
+  "icons": [
+
+    {
+
+      "src": "/assets/icons/icon.svg",
+
+      "sizes": "512x512",
+
+      "type": "image/svg+xml",
+
+      "purpose": "any maskable"
+
+    },
+
+    {
+
+      "src": "/assets/icons/icon-192.png",
+
+      "sizes": "192x192",
+
+      "type": "image/png",
+
+      "purpose": "any maskable"
+
+    },
+
+    {
+
+      "src": "/assets/icons/icon-512.png",
+
+      "sizes": "512x512",
+
+      "type": "image/png",
+
+      "purpose": "any maskable"
+
+    }
+
+  ]
+
+}
+
+

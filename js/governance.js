@@ -14,6 +14,59 @@ import {
 export const DEFAULT_CAPTURE_METHOD = 'field_capture_qcm';
 export const DEFAULT_CAPTURE_METHOD_LABEL = 'Field Capture QCM';
 
+export const COMPLETED_PACKET_VERSION = '1.0.0';
+export const SUPPORTED_IMPORT_PACKET_VERSIONS = ['1.0', '1.0.0', 1, '1'];
+
+export const QUEUE_STATUSES = {
+  QUEUED: 'queued',
+  ACTIVE_CAPTURE: 'active_capture',
+  COMPLETED_CAPTURE: 'completed_capture',
+  READY_FOR_EXPORT: 'ready_for_export',
+  EXPORTED: 'exported',
+  FAILED_VALIDATION: 'failed_validation',
+  ADMIN_REVIEW_REQUIRED: 'admin_review_required',
+  RESOLVED: 'resolved',
+};
+
+export const FIELD_PACKET_STATUSES = {
+  QUEUED_FOR_FIELD_CAPTURE: 'queued_for_field_capture',
+  FIELD_CAPTURE_IN_PROGRESS: 'field_capture_in_progress',
+  FIELD_CAPTURE_COMPLETE: 'field_capture_complete',
+  READY_FOR_UECS_LITE: 'ready_for_uecs_lite',
+  EXPORTED: 'exported',
+};
+
+export const FORBIDDEN_EXPORT_TERMS = [
+  'inspection conclusion',
+  'engineering conclusion',
+  'insurance coverage',
+  'damage cause',
+  'ipcs',
+  'uecs full',
+  'edis',
+  'level ii',
+  'level iii',
+  'level iv',
+  'level v',
+  'code compliance',
+  'repair recommendation',
+  'structural failure',
+];
+
+export const CAPTURE_POLICY_ENHANCEMENT_MAP = {
+  aerial: 'aerial_documentation',
+  aerial_documentation: 'aerial_documentation',
+  '360': 'reference_360_capture',
+  reference_360: 'reference_360_capture',
+  rtk: 'verified_location_capture',
+  verified_location: 'verified_location_capture',
+  lidar: 'spatial_record_capture',
+  spatial: 'spatial_record_capture',
+  spatial_record: 'spatial_record_capture',
+  enhanced_camera: 'enhanced_camera_capture',
+  standard_camera: 'enhanced_camera_capture',
+};
+
 export const IMPORT_INCOMPLETE_MESSAGE =
   'Project packet incomplete. Return to ClientFlow / UECS Lite and regenerate the project packet.';
 
@@ -129,6 +182,67 @@ function getImportField(data, ...keys) {
   return null;
 }
 
+function normalizePacketVersion(value) {
+  if (value == null || value === '') return null;
+  return String(value).trim();
+}
+
+export function isSupportedImportPacketVersion(version) {
+  if (version == null || version === '') return false;
+  return SUPPORTED_IMPORT_PACKET_VERSIONS.some(
+    (supported) => String(supported) === String(version)
+  );
+}
+
+export function applyCapturePolicyProfile(project, profile, warnings = []) {
+  if (!profile || typeof profile !== 'object') {
+    project.capture_policy_profile = profile || null;
+    project.capture_policy_notes = '';
+    project.enhanced_camera_capture = false;
+    project.aerial_documentation = false;
+    project.reference_360_capture = false;
+    project.verified_location_capture = false;
+    project.spatial_record_capture = false;
+    return project;
+  }
+
+  project.capture_policy_profile = profile;
+  project.capture_policy_notes =
+    profile.notes || profile.capture_notes || profile.policy_notes || '';
+
+  const requestedFlags = Object.values(ENHANCEMENT_KEYS).reduce((acc, entry) => {
+    acc[entry.key] = !!project[entry.key];
+    return acc;
+  }, {});
+
+  const allowed = new Set(
+    (profile.allowed_enhancements || profile.authorized_enhancements || []).map((item) =>
+      String(item).toLowerCase().replace(/\s+/g, '_')
+    )
+  );
+
+  const enhancementKeys = Object.values(ENHANCEMENT_KEYS).map((entry) => entry.key);
+  for (const key of enhancementKeys) {
+    project[key] = false;
+  }
+
+  for (const [alias, projectKey] of Object.entries(CAPTURE_POLICY_ENHANCEMENT_MAP)) {
+    if (allowed.has(alias) || profile[projectKey] === true) {
+      project[projectKey] = true;
+    }
+  }
+
+  const unauthorized = enhancementKeys.filter((key) => requestedFlags[key] && !project[key]);
+
+  if (unauthorized.length) {
+    warnings.push(
+      'Some requested capture enhancements are not authorized by capture_policy_profile and were disabled.'
+    );
+  }
+
+  return project;
+}
+
 export function validateUecsLiteImport(data) {
   const warnings = [];
   const errors = [];
@@ -145,6 +259,9 @@ export function validateUecsLiteImport(data) {
   const docControl = getImportField(data, 'documentation_control_classification');
   const defaultCaptureMethod = getImportField(data, 'default_capture_method');
   const adminReviewRequired = getImportField(data, 'admin_review_required');
+  const packetVersion = normalizePacketVersion(getImportField(data, 'packet_version', 'version'));
+  const capturePolicyProfile = getImportField(data, 'capture_policy_profile') || data.capture_policy_profile;
+  const xpdOnly = getImportField(data, 'xpd_only');
   const stormreadyEligible = getImportField(
     data,
     'stormready_eligible',
@@ -161,6 +278,11 @@ export function validateUecsLiteImport(data) {
   if (!docControl) errors.push('documentation_control_classification');
   if (!defaultCaptureMethod) errors.push('default_capture_method');
   if (adminReviewRequired == null) errors.push('admin_review_required');
+  if (!packetVersion || !isSupportedImportPacketVersion(packetVersion)) {
+    errors.push('packet_version (unsupported schema/version)');
+  }
+  if (xpdOnly !== true) errors.push('xpd_only (must be true for Phase 1 Field Capture)');
+  if (!capturePolicyProfile) errors.push('capture_policy_profile');
 
   if (errors.length) {
     return { valid: false, errors, warnings, project: null };
@@ -202,8 +324,14 @@ export function validateUecsLiteImport(data) {
     reference_360_capture: source.reference_360_capture ?? data.reference_360_capture ?? false,
     verified_location_capture: source.verified_location_capture ?? data.verified_location_capture ?? false,
     spatial_record_capture: source.spatial_record_capture ?? data.spatial_record_capture ?? false,
+    packet_version: packetVersion,
+    capture_policy_profile: capturePolicyProfile,
+    xpd_only: true,
+    field_packet_status: FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE,
+    project_status: FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE,
   };
 
+  applyCapturePolicyProfile(project, capturePolicyProfile, warnings);
   applyXpdCaptureDefaults(project, warnings);
 
   if (project.aerial_documentation) {
@@ -430,6 +558,132 @@ export function applyExportCompleted(project) {
 
 export function isProjectExportComplete(project) {
   return !!project?.field_export_completed;
+}
+
+export function sanitizeClientFacingText(text) {
+  if (text == null) return '';
+  let sanitized = String(text);
+  for (const term of FORBIDDEN_EXPORT_TERMS) {
+    const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    sanitized = sanitized.replace(pattern, '[redacted]');
+  }
+  return sanitized;
+}
+
+export function buildCaptureChecklistSummary(shotList, coverage, sfm = null) {
+  const requiredViewsCompleted = coverage?.requiredViewsComplete ?? coverage?.requiredZonesComplete ?? 0;
+  const requiredViewsTotal = coverage?.requiredViewsTotal ?? coverage?.requiredZonesTotal ?? 0;
+  const sections = [];
+
+  if (sfm?.passes) {
+    for (const pass of sfm.passes) {
+      sections.push({
+        section_id: pass.id,
+        section_name: pass.name,
+        completed: pass.completed ?? false,
+        required_views: pass.requiredViews?.length ?? 0,
+        captured_views: pass.capturedViews?.length ?? 0,
+      });
+    }
+  } else if (shotList?.zones) {
+    for (const zone of shotList.zones.filter((z) => z.required)) {
+      sections.push({
+        section_id: zone.id,
+        section_name: zone.name,
+        completed: !!zone.captured,
+        required_views: (zone.minWide || 0) + (zone.minCloseup || 0),
+        captured_views: zone.captured ? 1 : 0,
+      });
+    }
+  }
+
+  return {
+    capture_sections_completed: sections.filter((section) => section.completed).length,
+    capture_sections_total: sections.length,
+    required_views_completed: requiredViewsCompleted,
+    required_views_total: requiredViewsTotal,
+    sections,
+  };
+}
+
+export function validateExportGate(project, coverage, shotList, sfm = null) {
+  const errors = [];
+  const checklist = buildCaptureChecklistSummary(shotList, coverage, sfm);
+
+  if (!project?.clientflow_request_id && !project?.is_test_project) {
+    errors.push('clientflow_request_id is required for export.');
+  }
+  if (!project?.uecs_project_id && !project?.project_id) {
+    errors.push('uecs_project_id is required for export.');
+  }
+  if (!project?.client_name) errors.push('client_name is required for export.');
+  if (!project?.project_address) errors.push('project_address is required for export.');
+  if (!isXpdPathway(project?.service_pathway)) {
+    errors.push('Export supports XPD documentation packages only.');
+  }
+
+  const readiness = coverage?.readiness;
+  const exportReadyLevels = ['READY_FOR_ADMIN_REVIEW', 'SITE_LIMITATION_REVIEW'];
+  if (!exportReadyLevels.includes(readiness)) {
+    errors.push('Required capture checklist is incomplete. Complete required views before export.');
+  }
+
+  if (checklist.required_views_total > 0 && checklist.required_views_completed < checklist.required_views_total) {
+    errors.push('Required views are not complete.');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    checklist,
+  };
+}
+
+export function buildQueueRecord({
+  project,
+  packet = null,
+  status = QUEUE_STATUSES.QUEUED,
+  validationStatus = 'pending',
+  validationErrors = [],
+  existing = null,
+}) {
+  const now = new Date().toISOString();
+  return {
+    queue_id: existing?.queue_id || `uecsq_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    project_id: project.project_id,
+    clientflow_request_id: project.clientflow_request_id || null,
+    uecs_project_id: project.uecs_project_id || project.project_id,
+    status,
+    created_at: existing?.created_at || now,
+    updated_at: now,
+    last_exported_at: existing?.last_exported_at || null,
+    export_count: existing?.export_count || 0,
+    validation_status: validationStatus,
+    validation_errors: validationErrors,
+    queued_at: existing?.queued_at || now,
+    sync_attempts: existing?.sync_attempts || 0,
+    sync_endpoint: existing?.sync_endpoint || null,
+    next_action: existing?.next_action || 'connect_uecs_lite_sync_endpoint',
+    payload_type: 'completed_field_packet',
+    payload_version: COMPLETED_PACKET_VERSION,
+    packet,
+  };
+}
+
+export function transitionQueueStatus(record, nextStatus, updates = {}) {
+  const now = new Date().toISOString();
+  return {
+    ...record,
+    ...updates,
+    status: nextStatus,
+    updated_at: now,
+    last_exported_at:
+      nextStatus === QUEUE_STATUSES.EXPORTED ? now : record.last_exported_at || updates.last_exported_at || null,
+    export_count:
+      nextStatus === QUEUE_STATUSES.EXPORTED
+        ? (record.export_count || 0) + 1
+        : record.export_count || 0,
+  };
 }
 
 export function getPathwayDefaults(pathway) {

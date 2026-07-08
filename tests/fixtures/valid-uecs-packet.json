@@ -1,0 +1,17 @@
+{
+  "source_system": "ClientFlow",
+  "packet_version": "1.0.0",
+  "xpd_only": true,
+  "clientflow_request_id": "cf_req_12345",
+  "uecs_project_id": "uecs_proj_67890",
+  "client_name": "Jane Homeowner",
+  "project_address": "123 Main St",
+  "service_pathway": "XPD Exterior Baseline Snapshot",
+  "documentation_control_classification": "UECS Lite",
+  "default_capture_method": "field_capture_qcm",
+  "admin_review_required": true,
+  "capture_policy_profile": {
+    "allowed_enhancements": ["enhanced_camera"],
+    "notes": "Ground-based XPD baseline only unless admin approves add-ons."
+  }
+}

@@ -16,7 +16,90 @@ import {
 import { computeCoverageSummary, computeProjectQcmSummary } from './qcm.js';
 import { getMissingZones } from './shotlists.js';
 import { usesSimpleFieldMethod, buildCapturePassesExport } from './simple-field-method.js';
-import { DEFAULT_CAPTURE_METHOD, TEST_WATERMARK } from './governance.js';
+import {
+  DEFAULT_CAPTURE_METHOD,
+  TEST_WATERMARK,
+  COMPLETED_PACKET_VERSION,
+  sanitizeClientFacingText,
+  buildCaptureChecklistSummary,
+  validateExportGate,
+} from './governance.js';
+
+export function buildCompletedFieldPacket(project, images, shotList, coverage, sfm = null) {
+  const checklist = buildCaptureChecklistSummary(shotList, coverage, sfm);
+  const missing = getMissingZones(shotList).map((z) => ({
+    zone_id: z.id,
+    zone_name: z.name,
+    min_wide: z.minWide,
+    min_closeup: z.minCloseup,
+    captured: z.captured,
+  }));
+
+  const adminReviewFlags = images
+    .filter((i) => i.qcm_status === 'ADMIN REVIEW' || i.admin_review)
+    .map((i) => ({
+      image_id: i.image_id,
+      zone: i.zone,
+      reason: i.field_notes || 'Admin review flagged',
+    }));
+
+  const exceptions = [
+    ...missing.map((zone) => ({
+      type: 'missing_required_zone',
+      zone_id: zone.zone_id,
+      zone_name: zone.zone_name,
+    })),
+    ...(coverage.missingViews || []).map((view) => ({
+      type: 'missing_required_view',
+      view_name: view,
+    })),
+  ];
+
+  const reasonCodes = [];
+  if (project.override_reason) reasonCodes.push(project.override_reason);
+  if (project.aerial_not_approved) reasonCodes.push('aerial_not_approved');
+  if (project.client_scope_notice_required) reasonCodes.push('client_scope_notice_required');
+  if (coverage.readiness === 'SITE_LIMITATION_REVIEW') reasonCodes.push('site_limitation_review');
+
+  const exportedAt = formatDateTime();
+
+  return {
+    source_system: 'Field_Capture_QCM',
+    target_system: 'UECS_Lite',
+    packet_type: 'completed_field_packet',
+    packet_version: COMPLETED_PACKET_VERSION,
+    clientflow_request_id: project.clientflow_request_id || null,
+    uecs_project_id: project.uecs_project_id || project.project_id,
+    client_name: project.client_name,
+    project_address: project.project_address,
+    service_pathway: project.service_pathway,
+    documentation_control_classification:
+      project.documentation_control_classification || DOC_CONTROL_CLASSIFICATION,
+    capture_method_used: project.default_capture_method || DEFAULT_CAPTURE_METHOD,
+    capture_policy_profile: project.capture_policy_profile || null,
+    capture_started_at: project.created_at || null,
+    capture_completed_at: project.capture_completed_at || exportedAt,
+    operator_name: project.field_user || null,
+    operator_id: project.field_user || null,
+    image_count: images.length,
+    capture_sections_completed: checklist.capture_sections_completed,
+    required_views_completed: checklist.required_views_completed,
+    capture_checklist: checklist,
+    exceptions,
+    reason_codes: reasonCodes,
+    admin_review_required: project.admin_review_required !== false,
+    qcm_status: project.qcm_status || 'field_qcm_completed',
+    field_packet_status: project.field_packet_status || 'ready_for_uecs_lite',
+    exported_at: exportedAt,
+    image_manifest: buildImageManifest(project, images),
+    images: images.map((img) => sanitizeImageForExport(img)),
+    missing_required_shots: missing,
+    admin_review_flags: adminReviewFlags,
+    coverage_summary: coverage,
+    capture_policy_notes: project.capture_policy_notes || '',
+    xpd_only: true,
+  };
+}
 
 export function buildProjectPacket(project, images, shotList, coverage, sfm = null) {
   const qcmSummary = computeProjectQcmSummary(images);
@@ -191,25 +274,51 @@ export function buildQcmSummaryExport(project, images, coverage) {
   };
 }
 
-export function buildFieldCaptureReportHtml(project, images, shotList, coverage) {
+export function buildFieldCaptureReportHtml(project, images, shotList, coverage, exportMeta = {}) {
   const qcm = computeProjectQcmSummary(images);
   const missing = getMissingZones(shotList);
+  const checklist = exportMeta.checklist || buildCaptureChecklistSummary(shotList, coverage);
+  const completedPacket = exportMeta.completedPacket || null;
+  const captureMethodUsed = sanitizeClientFacingText(
+    project.default_capture_method === DEFAULT_CAPTURE_METHOD
+      ? 'Field Capture QCM'
+      : project.default_capture_method || 'Field Capture QCM'
+  );
 
   const rows = images
     .filter((i) => i.accepted)
     .map(
       (img) => `
     <tr>
-      <td>${escapeHtml(img.zone_name || img.zone)}</td>
-      <td>${escapeHtml(img.wide_or_closeup || '—')}</td>
+      <td>${escapeHtml(sanitizeClientFacingText(img.zone_name || img.zone))}</td>
+      <td>${escapeHtml(sanitizeClientFacingText(img.wide_or_closeup || '—'))}</td>
       <td>${img.qcm_score ?? '—'}</td>
-      <td><span class="status-${statusClass(img.qcm_status)}">${escapeHtml(img.qcm_status || '—')}</span></td>
+      <td><span class="status-${statusClass(img.qcm_status)}">${escapeHtml(sanitizeClientFacingText(img.qcm_status || '—'))}</span></td>
     </tr>`
     )
     .join('');
 
   const missingList = missing
-    .map((z) => `<li>${escapeHtml(z.name)}</li>`)
+    .map((z) => `<li>${escapeHtml(sanitizeClientFacingText(z.name))}</li>`)
+    .join('');
+
+  const checklistRows = (checklist.sections || [])
+    .map(
+      (section) => `
+    <tr>
+      <td>${escapeHtml(sanitizeClientFacingText(section.section_name))}</td>
+      <td>${section.completed ? 'Complete' : 'Incomplete'}</td>
+      <td>${section.captured_views ?? 0} / ${section.required_views ?? 0}</td>
+    </tr>`
+    )
+    .join('');
+
+  const exceptionList = (completedPacket?.exceptions || [])
+    .map((item) => `<li>${escapeHtml(sanitizeClientFacingText(item.zone_name || item.view_name || item.type))}</li>`)
+    .join('');
+
+  const reasonCodeList = (completedPacket?.reason_codes || [])
+    .map((code) => `<li>${escapeHtml(sanitizeClientFacingText(code))}</li>`)
     .join('');
 
   const testWatermark = project.is_test_project
@@ -221,7 +330,7 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Field Capture Report — ${escapeHtml(project.project_id)}</title>
+  <title>Field Capture Summary — ${escapeHtml(project.project_id)}</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 24px; color: #1a1a1a; }
     h1 { color: #b8923f; font-size: 1.4rem; }
@@ -242,30 +351,44 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
     .disclaimer { font-size: 0.75rem; color: #666; margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; }
     ul { padding-left: 20px; }
     .test-watermark { background: repeating-linear-gradient(-45deg, #fff3cd, #fff3cd 10px, #ffe69c 10px, #ffe69c 20px); border: 2px dashed #bf8700; color: #9a6700; font-weight: 700; text-align: center; padding: 12px; margin-bottom: 16px; font-size: 0.9rem; }
+    .admin-note { background: #fff8e1; border-left: 4px solid #b8923f; padding: 12px; margin: 16px 0; }
   </style>
 </head>
 <body>
   ${testWatermark}
   <h1>${escapeHtml(SYSTEM_NAME)}</h1>
-  <p><strong>${escapeHtml(VERSION)}</strong> — Field Capture Report</p>
+  <p><strong>${escapeHtml(VERSION)}</strong> — Internal Field Capture Summary (Admin Handoff)</p>
+  <div class="admin-note">This document supports admin handoff and is not the final client-facing report.</div>
 
   <div class="meta">
     <p><strong>Project ID:</strong> ${escapeHtml(project.project_id)}</p>
+    <p><strong>UECS Lite Project ID:</strong> ${escapeHtml(project.uecs_project_id || project.project_id)}</p>
+    <p><strong>ClientFlow Request ID:</strong> ${escapeHtml(project.clientflow_request_id || '—')}</p>
     <p><strong>Client:</strong> ${escapeHtml(project.client_name)} ${project.client_company ? `(${escapeHtml(project.client_company)})` : ''}</p>
-    <p><strong>Address:</strong> ${escapeHtml(project.project_address)}, ${escapeHtml(project.city)} ${escapeHtml(project.state)} ${escapeHtml(project.zip)}</p>
+    <p><strong>Property Address:</strong> ${escapeHtml(project.project_address)}, ${escapeHtml(project.city)} ${escapeHtml(project.state)} ${escapeHtml(project.zip)}</p>
     <p><strong>Service Pathway:</strong> ${escapeHtml(project.service_pathway)}</p>
-    <p><strong>Default Capture Method:</strong> Field Capture QCM</p>
-    <p><strong>Documentation Control:</strong> ${escapeHtml(project.documentation_control_classification)}</p>
+    <p><strong>Capture Method Used:</strong> ${escapeHtml(captureMethodUsed)}</p>
+    <p><strong>Documentation Classification:</strong> ${escapeHtml(project.documentation_control_classification)}</p>
     <p><strong>Admin Review Required:</strong> ${project.admin_review_required !== false ? 'YES' : 'NO'}</p>
-    <p><strong>Field User:</strong> ${escapeHtml(project.field_user)}</p>
-    <p><strong>Date:</strong> ${escapeHtml(project.date)}</p>
-    <p><strong>Export:</strong> ${escapeHtml(formatDateTime())}</p>
+    <p><strong>Field User:</strong> ${escapeHtml(project.field_user || '—')}</p>
+    <p><strong>Image Count:</strong> ${images.length}</p>
+    <p><strong>Export Timestamp:</strong> ${escapeHtml(completedPacket?.exported_at || formatDateTime())}</p>
   </div>
 
   <div class="readiness ${readinessCss(coverage.readiness)}">
     Documentation Readiness: ${escapeHtml(formatReadiness(coverage.readiness))} (${coverage.packageReadiness}%)
   </div>
-  <p>${escapeHtml(coverage.statusMessage)}</p>
+  <p>${escapeHtml(sanitizeClientFacingText(coverage.statusMessage))}</p>
+
+  <h2>Capture Checklist Completion</h2>
+  <div class="meta">
+    <p>Sections Complete: ${checklist.capture_sections_completed} / ${checklist.capture_sections_total}</p>
+    <p>Required Views Complete: ${checklist.required_views_completed} / ${checklist.required_views_total}</p>
+  </div>
+  <table>
+    <thead><tr><th>Section</th><th>Status</th><th>Views</th></tr></thead>
+    <tbody>${checklistRows || '<tr><td colspan="3">No checklist sections defined.</td></tr>'}</tbody>
+  </table>
 
   <h2>Capture Summary</h2>
   <div class="meta">
@@ -276,6 +399,8 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
     <p>Warnings: ${coverage.warnings} | Retake Recommended: ${coverage.retakes}</p>
   </div>
 
+  ${exceptionList ? `<h2>Exceptions</h2><ul>${exceptionList}</ul>` : ''}
+  ${reasonCodeList ? `<h2>Reason Codes</h2><ul>${reasonCodeList}</ul>` : ''}
   ${missing.length ? `<h2>Missing Required Zones</h2><ul>${missingList}</ul>` : ''}
 
   <h2>Accepted Images</h2>
@@ -284,7 +409,7 @@ export function buildFieldCaptureReportHtml(project, images, shotList, coverage)
     <tbody>${rows || '<tr><td colspan="4">No accepted images yet.</td></tr>'}</tbody>
   </table>
 
-  <div class="disclaimer">${escapeHtml(DISCLAIMER)}</div>
+  <div class="disclaimer">${escapeHtml(sanitizeClientFacingText(DISCLAIMER))}</div>
 </body>
 </html>`;
 }
@@ -328,15 +453,28 @@ function formatReadiness(level) {
 
 export async function exportProject(project, images, shotList, sfm = null) {
   const coverage = computeCoverageSummary(project, images, shotList, sfm);
+  const gate = validateExportGate(project, coverage, shotList, sfm);
+  if (!gate.valid) {
+    const error = new Error(gate.errors.join(' '));
+    error.code = 'EXPORT_BLOCKED';
+    error.errors = gate.errors;
+    throw error;
+  }
+
+  const completedPacket = buildCompletedFieldPacket(project, images, shotList, coverage, sfm);
   const packet = buildProjectPacket(project, images, shotList, coverage, sfm);
   const manifest = buildImageManifest(project, images);
   const qcmExport = buildQcmSummaryExport(project, images, coverage);
-  const reportHtml = buildFieldCaptureReportHtml(project, images, shotList, coverage);
+  const reportHtml = buildFieldCaptureReportHtml(project, images, shotList, coverage, {
+    checklist: gate.checklist,
+    completedPacket,
+  });
 
   const exportId = `export_${Date.now()}`;
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const prefix = project.project_id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
+  downloadJson(completedPacket, `${prefix}_completed_field_packet_${timestamp}.json`);
   downloadJson(packet, `${prefix}_project_packet_${timestamp}.json`);
   downloadJson(manifest, `${prefix}_image_manifest_${timestamp}.json`);
   downloadJson(qcmExport, `${prefix}_qcm_summary_${timestamp}.json`);
@@ -346,6 +484,7 @@ export async function exportProject(project, images, shotList, sfm = null) {
     export_id: exportId,
     export_timestamp: formatDateTime(),
     files: [
+      `${prefix}_completed_field_packet_${timestamp}.json`,
       `${prefix}_project_packet_${timestamp}.json`,
       `${prefix}_image_manifest_${timestamp}.json`,
       `${prefix}_qcm_summary_${timestamp}.json`,
@@ -353,5 +492,7 @@ export async function exportProject(project, images, shotList, sfm = null) {
     ],
     coverage,
     packet,
+    completedPacket,
+    checklist: gate.checklist,
   };
 }

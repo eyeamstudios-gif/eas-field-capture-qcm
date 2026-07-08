@@ -157,6 +157,31 @@ export async function saveUecsLiteQueueRecord(record) {
   await promisifyRequest(transaction.objectStore('uecs_lite_queue').put(record));
 }
 
+export async function getUecsLiteQueueRecord(queueId) {
+  const transaction = await tx('uecs_lite_queue');
+  return promisifyRequest(transaction.objectStore('uecs_lite_queue').get(queueId));
+}
+
+export async function updateUecsLiteQueueRecord(queueId, updates) {
+  const existing = await getUecsLiteQueueRecord(queueId);
+  if (!existing) return null;
+  const updated = {
+    ...existing,
+    ...updates,
+    queue_id: queueId,
+    updated_at: new Date().toISOString(),
+  };
+  await saveUecsLiteQueueRecord(updated);
+  return updated;
+}
+
+export async function getLatestUecsLiteQueueRecord(projectId) {
+  const records = await getUecsLiteQueueRecords(projectId);
+  if (!records.length) return null;
+  records.sort((a, b) => new Date(b.updated_at || b.queued_at) - new Date(a.updated_at || a.queued_at));
+  return records[0];
+}
+
 export async function getUecsLiteQueueRecords(projectId = null) {
   const transaction = await tx('uecs_lite_queue');
   const store = transaction.objectStore('uecs_lite_queue');

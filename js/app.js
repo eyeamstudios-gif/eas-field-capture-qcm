@@ -53,7 +53,7 @@ import {
   getShotListStatus,
   saveExportRecord,
   saveUecsLiteQueueRecord,
-  getUecsLiteQueueRecords,
+  getLatestUecsLiteQueueRecord,
   setActiveProjectId,
   getActiveProjectId,
   getImageDataUrl,
@@ -61,7 +61,7 @@ import {
 
 import { runQcmAnalysis, computeCoverageSummary, computeProjectQcmSummary } from './qcm.js';
 import { CameraCapture, createFileInputCapture } from './camera.js';
-import { buildProjectPacket, exportProject } from './export.js';
+import { exportProject, buildCompletedFieldPacket } from './export.js';
 import {
   validateUecsLiteImport,
   applyXpdCaptureDefaults,
@@ -84,6 +84,10 @@ import {
   AERIAL_STATUSES,
   DEFAULT_CAPTURE_METHOD,
   DEFAULT_CAPTURE_METHOD_LABEL,
+  FIELD_PACKET_STATUSES,
+  QUEUE_STATUSES,
+  buildQueueRecord,
+  transitionQueueStatus,
 } from './governance.js';
 import {
   usesSimpleFieldMethod,
@@ -552,6 +556,63 @@ function onPathwayChange() {
   renderCaptureMethodDisplay('#intake-capture-method-display', draftProject);
 }
 
+async function createProjectFromImportedPacket(project, importSource, data) {
+  const pathway = project.service_pathway;
+  assertXpdPathway(pathway);
+
+  project.created_at = formatDateTime();
+  project.updated_at = formatDateTime();
+  project.import_source = importSource;
+  project.import_method = 'uecs_lite';
+  project.linked_to_clientflow = true;
+  project.uecs_delivery_status = QUEUE_STATUSES.ACTIVE_CAPTURE;
+  project.project_status = FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS;
+  project.field_packet_status = FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS;
+  project.field_export_required = true;
+  project.field_export_completed = false;
+  project.ready_for_admin_review = false;
+  project.qcm_status = 'field_capture_in_progress';
+  project.review_status = 'field_capture';
+  project.uecs_project_id = project.uecs_project_id || project.project_id;
+  project.capture_started_at = project.created_at;
+
+  applyXpdCaptureDefaults(project);
+  if (project.aerial_documentation) {
+    applyAerialFallback(project);
+  }
+  applyXpdProjectMetadata(project);
+
+  state.project = project;
+  state.shotList = generateShotList(pathway);
+  state.images = [];
+  state.sfm = usesSimpleFieldMethod(pathway) ? initSimpleFieldMethod() : null;
+  state.importedProjectSource = importSource;
+
+  await saveProject(project);
+  await saveShotListStatus({ project_id: project.project_id, shotList: state.shotList, sfm: state.sfm });
+  setActiveProjectId(project.project_id);
+
+  const queueRecord = buildQueueRecord({
+    project,
+    status: QUEUE_STATUSES.ACTIVE_CAPTURE,
+    validationStatus: 'import_validated',
+    validationErrors: [],
+  });
+  queueRecord.readiness = 'FIELD_CAPTURE_IN_PROGRESS';
+  queueRecord.accepted_images = 0;
+  queueRecord.source_packet_version = data.packet_version || null;
+  await saveUecsLiteQueueRecord(queueRecord);
+  state.activeQueueId = queueRecord.queue_id;
+
+  if (isSfm()) {
+    renderDashboard();
+    showScreen('screen-dashboard');
+  } else {
+    renderShotList();
+    showScreen('screen-shots');
+  }
+}
+
 async function handleProjectImport(e) {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -563,36 +624,29 @@ async function handleProjectImport(e) {
     const result = validateUecsLiteImport(data);
 
     if (!result.valid) {
-      statusEl.innerHTML = `<div class="alert alert-warning">${escapeHtml(IMPORT_INCOMPLETE_MESSAGE)}</div>`;
+      statusEl.innerHTML = `<div class="alert alert-warning">${escapeHtml(IMPORT_INCOMPLETE_MESSAGE)}<br>Missing or invalid: ${escapeHtml(result.errors.join(', '))}</div>`;
       return;
     }
 
     const project = result.project;
-    state.pendingImportProject = project;
-
-    resetIntakeForm();
-    populateIntakeForm(project);
-    state.importedProjectSource = {
+    const importSource = {
       file_name: file.name,
       imported_at: formatDateTime(),
-      source_system: data.system || data.source_system || 'UECS Lite import',
+      source_system: data.source_system || data.system || 'UECS_Lite',
       clientflow_request_id: project.clientflow_request_id || null,
       uecs_project_id: project.uecs_project_id || project.project_id || null,
+      packet_version: project.packet_version || null,
     };
-    state.pendingImportProject = null;
 
-    renderGovernanceBanner('#intake-governance-banner', project);
-    renderCaptureMethodDisplay('#intake-capture-method-display', project);
-    updateManualOverrideSection();
-    updateAerialNotApprovedNotice(project);
+    await createProjectFromImportedPacket(project, importSource, data);
 
-    let statusHtml = `<div class="alert alert-info">Loaded project info from ${escapeHtml(file.name)}. Review details, then create the field capture.</div>`;
+    let statusHtml = `<div class="alert alert-info">Imported ${escapeHtml(file.name)} and started field capture for ${escapeHtml(project.project_id)}.</div>`;
     if (result.warnings.length) {
       statusHtml += result.warnings.map((w) => `<div class="alert alert-warning">${escapeHtml(w)}</div>`).join('');
     }
     statusEl.innerHTML = statusHtml;
     $('#intake-autofill-status').innerHTML = statusHtml;
-    showScreen('screen-intake');
+    showToast('Project imported — field capture in progress', 'success');
   } catch (err) {
     console.error(err);
     statusEl.innerHTML = `<div class="alert alert-warning">Import failed: ${escapeHtml(err.message)}</div>`;
@@ -735,6 +789,11 @@ async function handleIntakeSubmit(e) {
     ready_for_admin_review: false,
     qcm_status: 'field_capture_in_progress',
     review_status: 'field_capture',
+    project_status: isManualStart
+      ? FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS
+      : FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS,
+    field_packet_status: FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS,
+    capture_started_at: formatDateTime(),
   };
 
   project.uecs_project_id = project.uecs_project_id || project.project_id;
@@ -761,6 +820,16 @@ async function handleIntakeSubmit(e) {
   await saveProject(project);
   await saveShotListStatus({ project_id: project.project_id, shotList: state.shotList, sfm: state.sfm });
   setActiveProjectId(project.project_id);
+
+  const queueRecord = buildQueueRecord({
+    project,
+    status: QUEUE_STATUSES.ACTIVE_CAPTURE,
+    validationStatus: isManualStart ? 'manual_override' : 'import_validated',
+  });
+  queueRecord.readiness = 'FIELD_CAPTURE_IN_PROGRESS';
+  queueRecord.accepted_images = 0;
+  await saveUecsLiteQueueRecord(queueRecord);
+  state.activeQueueId = queueRecord.queue_id;
 
   if (isSfm()) {
     renderDashboard();
@@ -1848,19 +1917,37 @@ async function renderUecsQueueStatus() {
   const el = $('#uecs-queue-status');
   if (!el || !state.project) return;
 
-  const records = await getUecsLiteQueueRecords(state.project.project_id);
-  if (!records.length) {
+  const latest = await getLatestUecsLiteQueueRecord(state.project.project_id);
+  if (!latest) {
     el.innerHTML = '<div class="alert alert-info">Not queued yet. Send when the packet is ready for UECS Lite intake.</div>';
     return;
   }
 
-  records.sort((a, b) => new Date(b.queued_at) - new Date(a.queued_at));
-  const latest = records[0];
   el.innerHTML = `
     <div class="alert alert-info">
-      UECS Lite packet queued: ${escapeHtml(latest.queued_at)}<br>
-      Status: ${escapeHtml(latest.status)} · Queue ID: ${escapeHtml(latest.queue_id)}
+      Queue ID: ${escapeHtml(latest.queue_id)}<br>
+      Status: ${escapeHtml(latest.status)}<br>
+      Validation: ${escapeHtml(latest.validation_status || 'pending')}<br>
+      Created: ${escapeHtml(latest.created_at || latest.queued_at || '—')}<br>
+      Updated: ${escapeHtml(latest.updated_at || '—')}<br>
+      Exports: ${latest.export_count ?? 0}${latest.last_exported_at ? ` · Last export: ${escapeHtml(latest.last_exported_at)}` : ''}
     </div>`;
+}
+
+async function updateQueueForCaptureProgress(coverage) {
+  if (!state.project) return;
+  const latest = await getLatestUecsLiteQueueRecord(state.project.project_id);
+  if (!latest) return;
+
+  const exportReady = ['READY_FOR_ADMIN_REVIEW', 'SITE_LIMITATION_REVIEW'].includes(coverage.readiness);
+  const nextStatus = exportReady ? QUEUE_STATUSES.READY_FOR_EXPORT : QUEUE_STATUSES.ACTIVE_CAPTURE;
+  const updated = transitionQueueStatus(latest, nextStatus, {
+    readiness: coverage.readiness,
+    accepted_images: coverage.accepted,
+    validation_status: exportReady ? 'capture_complete' : 'capture_in_progress',
+  });
+  await saveUecsLiteQueueRecord(updated);
+  state.activeQueueId = updated.queue_id;
 }
 
 async function handleExport() {
@@ -1869,16 +1956,38 @@ async function handleExport() {
   if (state.sfm) state.sfm = updateSimpleFieldProgress(state.sfm, state.images);
 
   try {
+    const coverage = getCoverage();
+    await updateQueueForCaptureProgress(coverage);
+
     const result = await exportProject(state.project, state.images, state.shotList, state.sfm);
-    const coverage = result.coverage;
-    if (coverage.overcapture?.adminReviewRequired) {
+    const exportCoverage = result.coverage;
+    if (exportCoverage.overcapture?.adminReviewRequired) {
       state.project.admin_review_required = true;
     }
 
-    applyFieldQcmStatus(state.project, coverage.readiness === 'READY_FOR_ADMIN_REVIEW');
+    applyFieldQcmStatus(state.project, exportCoverage.readiness === 'READY_FOR_ADMIN_REVIEW');
     applyExportCompleted(state.project);
+    state.project.capture_completed_at = formatDateTime();
+    state.project.field_packet_status = FIELD_PACKET_STATUSES.EXPORTED;
+    state.project.project_status = FIELD_PACKET_STATUSES.READY_FOR_UECS_LITE;
     state.project.updated_at = formatDateTime();
     await saveProject(state.project);
+
+    const latest = await getLatestUecsLiteQueueRecord(state.project.project_id);
+    if (latest) {
+      const queueStatus = state.project.admin_review_required
+        ? QUEUE_STATUSES.ADMIN_REVIEW_REQUIRED
+        : QUEUE_STATUSES.EXPORTED;
+      const updated = transitionQueueStatus(latest, queueStatus, {
+        packet: result.completedPacket,
+        readiness: exportCoverage.readiness,
+        accepted_images: exportCoverage.accepted,
+        validation_status: 'export_validated',
+        validation_errors: [],
+      });
+      await saveUecsLiteQueueRecord(updated);
+      state.activeQueueId = updated.queue_id;
+    }
 
     await saveExportRecord({
       export_id: result.export_id,
@@ -1887,13 +1996,29 @@ async function handleExport() {
       files: result.files,
       readiness: result.coverage.readiness,
       export_complete: true,
+      completed_field_packet: result.completedPacket,
     });
 
     $('#export-status').innerHTML = `<div class="alert alert-info">Export complete. ${result.files.length} files downloaded.<br>Status: ${readinessLabel(result.coverage.readiness)}<br>Ready for admin QCM review. Transfer export files to admin.</div>`;
     showToast(`Export complete — ${result.files.length} files`, 'success');
+    await renderUecsQueueStatus();
   } catch (err) {
     console.error(err);
-    $('#export-status').innerHTML = `<div class="alert alert-warning">Export failed: ${escapeHtml(err.message)}</div>`;
+    const message =
+      err.code === 'EXPORT_BLOCKED'
+        ? `Export blocked: ${err.errors?.join(' ') || err.message}`
+        : `Export failed: ${err.message}`;
+    $('#export-status').innerHTML = `<div class="alert alert-warning">${escapeHtml(message)}</div>`;
+
+    const latest = await getLatestUecsLiteQueueRecord(state.project.project_id);
+    if (latest) {
+      const updated = transitionQueueStatus(latest, QUEUE_STATUSES.FAILED_VALIDATION, {
+        validation_status: 'export_blocked',
+        validation_errors: err.errors || [err.message],
+      });
+      await saveUecsLiteQueueRecord(updated);
+      await renderUecsQueueStatus();
+    }
   }
 }
 
@@ -1904,28 +2029,25 @@ async function handleSendToUecsLite() {
 
   try {
     const coverage = getCoverage();
-    const packet = buildProjectPacket(state.project, state.images, state.shotList, coverage, state.sfm);
-    const record = {
-      queue_id: generateId('uecsq'),
-      project_id: state.project.project_id,
-      uecs_project_id: state.project.uecs_project_id || state.project.project_id,
-      status: 'queued',
-      queued_at: formatDateTime(),
-      sync_attempts: 0,
-      sync_endpoint: null,
-      next_action: 'connect_uecs_lite_sync_endpoint',
-      readiness: coverage.readiness,
-      accepted_images: coverage.accepted,
-      payload_type: 'field_capture_project_packet',
-      payload_version: 1,
+    const packet = buildCompletedFieldPacket(state.project, state.images, state.shotList, coverage, state.sfm);
+    const existing = await getLatestUecsLiteQueueRecord(state.project.project_id);
+    const record = buildQueueRecord({
+      project: state.project,
       packet,
-    };
+      status: QUEUE_STATUSES.QUEUED,
+      validationStatus: 'ready_for_uecs_lite',
+      existing,
+    });
+    record.readiness = coverage.readiness;
+    record.accepted_images = coverage.accepted;
 
     await saveUecsLiteQueueRecord(record);
-    state.project.uecs_delivery_status = 'queued';
-    state.project.uecs_queued_at = record.queued_at;
+    state.project.uecs_delivery_status = QUEUE_STATUSES.QUEUED;
+    state.project.uecs_queued_at = record.updated_at;
+    state.project.field_packet_status = FIELD_PACKET_STATUSES.READY_FOR_UECS_LITE;
     state.project.updated_at = formatDateTime();
     await saveProject(state.project);
+    state.activeQueueId = record.queue_id;
 
     $('#export-status').innerHTML = `<div class="alert alert-info">${escapeHtml(UECS_LITE_QUEUE_MESSAGE)}</div>`;
     await renderUecsQueueStatus();
