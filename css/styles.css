@@ -2278,3 +2278,18 @@ select.form-control {
   padding: 0.45rem 0.85rem;
   font-size: 0.82rem;
 }
+
+.project-item-pending {
+  border-color: var(--border-strong);
+}
+
+.project-item-meta {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.project-item-next {
+  border-color: var(--accent-gold-bright);
+  box-shadow: var(--shadow-glow);
+}

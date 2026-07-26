@@ -68,10 +68,10 @@ export const CAPTURE_POLICY_ENHANCEMENT_MAP = {
 };
 
 export const IMPORT_INCOMPLETE_MESSAGE =
-  'Project packet incomplete. Return to ClientFlow / UECS Lite and regenerate the project packet.';
+  'Project packet incomplete. Return to ClientFlow and regenerate the field handoff packet.';
 
 export const MANUAL_OVERRIDE_WARNING =
-  'This project is not linked to a ClientFlow request or UECS Lite packet. Use manual override only for test, sample, or emergency documentation.';
+  'This project is not linked to a ClientFlow request. Use manual override only for test, sample, or emergency documentation.';
 
 export const DEFAULT_CAPTURE_WARNING =
   'Default capture method was not provided. Field Capture QCM has been applied as the XPD default.';
@@ -80,10 +80,32 @@ export const AERIAL_NOT_APPROVED_MESSAGE =
   'Aerial documentation is not currently approved. Continue with Field Capture QCM ground-based baseline unless admin requires reschedule or client scope revision.';
 
 export const EXPORT_REQUIRED_MESSAGE =
-  'Export Required. Phase 1 does not upload automatically. Send to UECS Lite is local queue only. Manual export and file transfer are required.';
+  'Export required before UECS Lite handoff. Phase 1 does not upload automatically — export files and transfer to admin.';
 
 export const UECS_LITE_QUEUE_MESSAGE =
-  'Queued locally for UECS Lite sync. This does not upload in Phase 1. Export files must still be transferred to admin.';
+  'Ready for UECS Lite handoff. Queued locally on this device — Phase 1 requires manual file transfer to admin.';
+
+export const PENDING_CLIENTFLOW_MESSAGE =
+  'ClientFlow field handoff received. Review details and start field capture when ready on site.';
+
+export const QUEUED_FIELD_HANDOFF_MESSAGE =
+  'ClientFlow field handoff received. This project is queued for field capture — review and start when ready on site.';
+
+export const OUTBOUND_UECS_LITE_HANDOFF_MESSAGE =
+  'Field capture complete. Hand off the exported packet to UECS Lite for admin review.';
+
+export const INBOUND_CLIENTFLOW_HANDOFF_LABEL = 'ClientFlow handoff';
+export const OUTBOUND_UECS_LITE_HANDOFF_LABEL = 'UECS Lite handoff';
+
+export const FIELD_HANDOFF_STATUS_ISSUED = 'issued';
+
+export const FIELD_HANDOFF_PACKET_TYPES = new Set([
+  'field_handoff',
+  'project_field_handoff',
+  'clientflow_field_handoff',
+  'uecs_lite_field_handoff',
+  'uecs_lite_project_handoff',
+]);
 
 export const TEST_WATERMARK = 'TEST / INTERNAL REVIEW — NOT FOR CLIENT DELIVERY';
 
@@ -340,6 +362,8 @@ export function validateUecsLiteImport(data) {
 
   applyXpdProjectMetadata(project);
 
+  applyFieldHandoffMetadata(project, data);
+
   return { valid: true, errors: [], warnings, project };
 }
 
@@ -396,6 +420,69 @@ export function applyManualOverrideFlags(project, overrideReason) {
   applyXpdProjectMetadata(project);
 
   return project;
+}
+
+export function isPendingClientFlowProject(project) {
+  return isQueuedFieldHandoffProject(project);
+}
+
+export function isQueuedFieldHandoffProject(project) {
+  return (
+    project?.linked_to_clientflow === true &&
+    project?.field_packet_status === FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE
+  );
+}
+
+export function isFieldHandoffPacket(data) {
+  if (!data || typeof data !== 'object') return false;
+  const packetType = getImportField(data, 'packet_type', 'packet_kind');
+  const handoffIssued = getImportField(data, 'field_handoff_issued');
+  const handoffStatus = getImportField(data, 'field_handoff_status');
+  return (
+    (packetType && FIELD_HANDOFF_PACKET_TYPES.has(String(packetType).toLowerCase())) ||
+    handoffIssued === true ||
+    handoffStatus === FIELD_HANDOFF_STATUS_ISSUED
+  );
+}
+
+export function applyFieldHandoffMetadata(project, data, importedAt = null) {
+  const issuedAt = getImportField(data, 'field_handoff_issued_at', 'handoff_issued_at', 'issued_at');
+  const handoffStatus = getImportField(data, 'field_handoff_status') || FIELD_HANDOFF_STATUS_ISSUED;
+  const packetType = getImportField(data, 'packet_type', 'packet_kind') || 'clientflow_field_handoff';
+
+  project.field_handoff_issued = true;
+  project.field_handoff_status = handoffStatus;
+  project.field_handoff_issued_at = issuedAt || importedAt || new Date().toISOString();
+  project.field_handoff_packet_type = packetType;
+  project.field_handoff_source = data.source_system || data.system || 'ClientFlow';
+  project.field_handoff_direction = 'inbound';
+
+  return project;
+}
+
+export function sortQueuedFieldHandoffProjects(projects) {
+  return [...projects]
+    .filter(isQueuedFieldHandoffProject)
+    .sort((a, b) => {
+      const aTime = new Date(a.field_handoff_issued_at || a.created_at || a.updated_at).getTime();
+      const bTime = new Date(b.field_handoff_issued_at || b.created_at || b.updated_at).getTime();
+      return aTime - bTime;
+    });
+}
+
+export function getNextQueuedFieldHandoffProject(projects) {
+  return sortQueuedFieldHandoffProjects(projects)[0] || null;
+}
+
+export function getFieldPacketStatusLabel(status) {
+  const labels = {
+    [FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE]: 'Queued for capture',
+    [FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS]: 'In progress',
+    [FIELD_PACKET_STATUSES.FIELD_CAPTURE_COMPLETE]: 'Capture complete',
+    [FIELD_PACKET_STATUSES.READY_FOR_UECS_LITE]: 'Ready for UECS Lite handoff',
+    [FIELD_PACKET_STATUSES.EXPORTED]: 'Exported',
+  };
+  return labels[status] || status || '—';
 }
 
 export function validateManualOverride({ fieldUser, overrideReason, projectAddress, servicePathway }) {

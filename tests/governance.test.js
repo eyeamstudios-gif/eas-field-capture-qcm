@@ -10,6 +10,13 @@ import {
   buildQueueRecord,
   transitionQueueStatus,
   sanitizeClientFacingText,
+  isPendingClientFlowProject,
+  isQueuedFieldHandoffProject,
+  isFieldHandoffPacket,
+  applyFieldHandoffMetadata,
+  getNextQueuedFieldHandoffProject,
+  sortQueuedFieldHandoffProjects,
+  getFieldPacketStatusLabel,
   QUEUE_STATUSES,
   FIELD_PACKET_STATUSES,
 } from '../js/governance.js';
@@ -64,6 +71,11 @@ test('valid UECS Lite packet import succeeds', () => {
   assert.equal(result.project.uecs_project_id, 'uecs_proj_67890');
   assert.equal(result.project.xpd_only, true);
   assert.equal(result.project.field_packet_status, FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE);
+  assert.equal(result.project.field_handoff_issued, true);
+  assert.equal(result.project.field_handoff_status, 'issued');
+  assert.equal(result.project.field_handoff_packet_type, 'clientflow_field_handoff');
+  assert.equal(result.project.field_handoff_source, 'ClientFlow');
+  assert.equal(result.project.field_handoff_direction, 'inbound');
 });
 
 test('invalid non-XPD packet is rejected', () => {
@@ -159,4 +171,65 @@ test('sanitizeClientFacingText removes forbidden terminology', () => {
   const sanitized = sanitizeClientFacingText(input);
   assert.ok(!sanitized.toLowerCase().includes('inspection conclusion'));
   assert.ok(sanitized.includes('[redacted]'));
+});
+
+test('isPendingClientFlowProject identifies queued ClientFlow imports', () => {
+  assert.equal(
+    isPendingClientFlowProject({
+      linked_to_clientflow: true,
+      field_packet_status: FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE,
+    }),
+    true
+  );
+  assert.equal(
+    isPendingClientFlowProject({
+      linked_to_clientflow: true,
+      field_packet_status: FIELD_PACKET_STATUSES.FIELD_CAPTURE_IN_PROGRESS,
+    }),
+    false
+  );
+});
+
+test('getFieldPacketStatusLabel distinguishes inbound and outbound handoffs', () => {
+  assert.equal(
+    getFieldPacketStatusLabel(FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE),
+    'Queued for capture'
+  );
+  assert.equal(
+    getFieldPacketStatusLabel(FIELD_PACKET_STATUSES.READY_FOR_UECS_LITE),
+    'Ready for UECS Lite handoff'
+  );
+});
+
+test('field handoff queue selects next project in issue order', () => {
+  const projects = [
+    {
+      project_id: 'proj_b',
+      linked_to_clientflow: true,
+      field_packet_status: FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE,
+      field_handoff_issued_at: '2026-07-09T12:00:00.000Z',
+    },
+    {
+      project_id: 'proj_a',
+      linked_to_clientflow: true,
+      field_packet_status: FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE,
+      field_handoff_issued_at: '2026-07-08T12:00:00.000Z',
+    },
+  ];
+
+  assert.equal(getNextQueuedFieldHandoffProject(projects)?.project_id, 'proj_a');
+  assert.equal(sortQueuedFieldHandoffProjects(projects)[1].project_id, 'proj_b');
+});
+
+test('isFieldHandoffPacket recognizes explicit handoff packets', () => {
+  assert.equal(isFieldHandoffPacket(validPacket), true);
+  assert.equal(
+    isFieldHandoffPacket({
+      ...validPacket,
+      field_handoff_issued: undefined,
+      field_handoff_status: undefined,
+      packet_type: 'field_handoff',
+    }),
+    true
+  );
 });

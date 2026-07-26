@@ -80,6 +80,10 @@ import {
   AERIAL_NOT_APPROVED_MESSAGE,
   EXPORT_REQUIRED_MESSAGE,
   UECS_LITE_QUEUE_MESSAGE,
+  PENDING_CLIENTFLOW_MESSAGE,
+  QUEUED_FIELD_HANDOFF_MESSAGE,
+  OUTBOUND_UECS_LITE_HANDOFF_MESSAGE,
+  INBOUND_CLIENTFLOW_HANDOFF_LABEL,
   OVERRIDE_REASONS,
   AERIAL_STATUSES,
   DEFAULT_CAPTURE_METHOD,
@@ -88,6 +92,12 @@ import {
   QUEUE_STATUSES,
   buildQueueRecord,
   transitionQueueStatus,
+  isPendingClientFlowProject,
+  isQueuedFieldHandoffProject,
+  getNextQueuedFieldHandoffProject,
+  sortQueuedFieldHandoffProjects,
+  applyFieldHandoffMetadata,
+  getFieldPacketStatusLabel,
 } from './governance.js';
 import {
   usesSimpleFieldMethod,
@@ -227,13 +237,18 @@ function bindEvents() {
   });
   $('#btn-import-project')?.addEventListener('click', () => $('#project-import-file')?.click());
   $('#project-import-file')?.addEventListener('change', handleProjectImport);
+  $('#btn-start-next-queued')?.addEventListener('click', handleStartNextQueuedProject);
 
   $('#btn-continue-project')?.addEventListener('click', async () => {
     const activeId = getActiveProjectId();
-    if (activeId) {
-      await loadProject(activeId);
-      showScreen('screen-dashboard');
+    if (!activeId) return;
+    const project = await getProject(activeId);
+    if (project && isPendingClientFlowProject(project)) {
+      await openPendingProjectReview(activeId);
+      return;
     }
+    await loadProject(activeId);
+    showScreen('screen-dashboard');
   });
 
   $('#intake-form')?.addEventListener('submit', handleIntakeSubmit);
@@ -493,6 +508,21 @@ async function handleUseCurrentGpsLocation() {
   }
 }
 
+function updateIntakeMode() {
+  const submitBtn = $('#btn-intake-submit');
+  const isPending = state.pendingImportProject && isPendingClientFlowProject(state.pendingImportProject);
+
+  if (submitBtn) {
+    submitBtn.textContent = isPending ? 'Start Field Capture' : 'Create Project & Begin Capture';
+  }
+
+  if (isPending) {
+    $('#manual-override-section')?.classList.add('hidden');
+  } else {
+    updateManualOverrideSection();
+  }
+}
+
 function resetIntakeForm() {
   const form = $('#intake-form');
   if (!form) return;
@@ -507,7 +537,7 @@ function resetIntakeForm() {
   $('#stormready-eligible').value = '';
   $('#stormready-section')?.classList.add('hidden');
   clearSiteLocationGpsFields();
-  updateManualOverrideSection();
+  updateIntakeMode();
   onPathwayChange();
 }
 
@@ -556,13 +586,11 @@ function onPathwayChange() {
   renderCaptureMethodDisplay('#intake-capture-method-display', draftProject);
 }
 
-async function createProjectFromImportedPacket(project, importSource, data) {
+async function activateClientFlowProject(project) {
   const pathway = project.service_pathway;
   assertXpdPathway(pathway);
 
-  project.created_at = formatDateTime();
   project.updated_at = formatDateTime();
-  project.import_source = importSource;
   project.import_method = 'uecs_lite';
   project.linked_to_clientflow = true;
   project.uecs_delivery_status = QUEUE_STATUSES.ACTIVE_CAPTURE;
@@ -574,7 +602,7 @@ async function createProjectFromImportedPacket(project, importSource, data) {
   project.qcm_status = 'field_capture_in_progress';
   project.review_status = 'field_capture';
   project.uecs_project_id = project.uecs_project_id || project.project_id;
-  project.capture_started_at = project.created_at;
+  project.capture_started_at = project.capture_started_at || formatDateTime();
 
   applyXpdCaptureDefaults(project);
   if (project.aerial_documentation) {
@@ -586,21 +614,27 @@ async function createProjectFromImportedPacket(project, importSource, data) {
   state.shotList = generateShotList(pathway);
   state.images = [];
   state.sfm = usesSimpleFieldMethod(pathway) ? initSimpleFieldMethod() : null;
-  state.importedProjectSource = importSource;
+  state.importedProjectSource = project.import_source || null;
+  state.pendingImportProject = null;
 
   await saveProject(project);
   await saveShotListStatus({ project_id: project.project_id, shotList: state.shotList, sfm: state.sfm });
   setActiveProjectId(project.project_id);
 
+  const existingQueue = await getLatestUecsLiteQueueRecord(project.project_id);
   const queueRecord = buildQueueRecord({
     project,
     status: QUEUE_STATUSES.ACTIVE_CAPTURE,
     validationStatus: 'import_validated',
     validationErrors: [],
+    existing: existingQueue,
   });
   queueRecord.readiness = 'FIELD_CAPTURE_IN_PROGRESS';
   queueRecord.accepted_images = 0;
-  queueRecord.source_packet_version = data.packet_version || null;
+  queueRecord.next_action = 'connect_uecs_lite_sync_endpoint';
+  if (project.import_source?.packet_version) {
+    queueRecord.source_packet_version = project.import_source.packet_version;
+  }
   await saveUecsLiteQueueRecord(queueRecord);
   state.activeQueueId = queueRecord.queue_id;
 
@@ -611,6 +645,97 @@ async function createProjectFromImportedPacket(project, importSource, data) {
     renderShotList();
     showScreen('screen-shots');
   }
+}
+
+async function savePendingClientFlowProject(project, importSource, data) {
+  const existing = await getProject(project.project_id);
+  if (existing && !isPendingClientFlowProject(existing)) {
+    throw new Error(`Project ${project.project_id} already exists and field capture has started.`);
+  }
+
+  project.created_at = existing?.created_at || formatDateTime();
+  project.updated_at = formatDateTime();
+  project.import_source = importSource;
+  project.import_method = 'uecs_lite';
+  project.linked_to_clientflow = true;
+  project.uecs_delivery_status = QUEUE_STATUSES.QUEUED;
+  project.field_packet_status = FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE;
+  project.project_status = FIELD_PACKET_STATUSES.QUEUED_FOR_FIELD_CAPTURE;
+  project.field_export_required = true;
+  project.field_export_completed = false;
+  project.ready_for_admin_review = false;
+  project.qcm_status = 'pending_field_capture';
+  project.review_status = 'awaiting_field_capture';
+  project.uecs_project_id = project.uecs_project_id || project.project_id;
+
+  applyXpdCaptureDefaults(project);
+  if (project.aerial_documentation) {
+    applyAerialFallback(project);
+  }
+  applyXpdProjectMetadata(project);
+
+  if (!project.field_handoff_issued) {
+    applyFieldHandoffMetadata(project, data, importSource.imported_at);
+  }
+
+  await saveProject(project);
+
+  const existingQueue = await getLatestUecsLiteQueueRecord(project.project_id);
+  const queueRecord = buildQueueRecord({
+    project,
+    status: QUEUE_STATUSES.QUEUED,
+    validationStatus: 'import_validated',
+    validationErrors: [],
+    existing: existingQueue,
+  });
+  queueRecord.readiness = 'QUEUED_FOR_FIELD_CAPTURE';
+  queueRecord.next_action = 'start_field_capture';
+  queueRecord.source_packet_version = data.packet_version || null;
+  await saveUecsLiteQueueRecord(queueRecord);
+
+  state.pendingImportProject = null;
+  state.importedProjectSource = null;
+  await loadHomeScreen();
+}
+
+async function openPendingProjectReview(projectId) {
+  const project = await getProject(projectId);
+  if (!project || !isPendingClientFlowProject(project)) {
+    await loadProject(projectId);
+    showScreen('screen-dashboard');
+    return;
+  }
+
+  const form = $('#intake-form');
+  if (form) form.reset();
+  $('#intake-governance-banner').innerHTML = '';
+  $('#intake-capture-method-display').innerHTML = '';
+  clearSiteLocationGpsFields();
+
+  state.pendingImportProject = project;
+  state.importedProjectSource = project.import_source || null;
+  populateIntakeForm(project);
+  updateIntakeMode();
+  $('#intake-autofill-status').innerHTML = `<div class="alert alert-info">${escapeHtml(QUEUED_FIELD_HANDOFF_MESSAGE)}</div>`;
+  showScreen('screen-intake');
+}
+
+async function handleStartNextQueuedProject() {
+  const nextProject = getNextQueuedFieldHandoffProject(state.homeProjects);
+  if (!nextProject) {
+    showToast('No queued ClientFlow handoffs', 'info');
+    return;
+  }
+  await openPendingProjectReview(nextProject.project_id);
+}
+
+async function createProjectFromImportedPacket(project, importSource, data) {
+  project.created_at = project.created_at || formatDateTime();
+  project.import_source = importSource;
+  if (data?.packet_version && project.import_source) {
+    project.import_source.packet_version = data.packet_version;
+  }
+  await activateClientFlowProject(project);
 }
 
 async function handleProjectImport(e) {
@@ -632,21 +757,20 @@ async function handleProjectImport(e) {
     const importSource = {
       file_name: file.name,
       imported_at: formatDateTime(),
-      source_system: data.source_system || data.system || 'UECS_Lite',
+      source_system: data.source_system || data.system || 'ClientFlow',
       clientflow_request_id: project.clientflow_request_id || null,
       uecs_project_id: project.uecs_project_id || project.project_id || null,
       packet_version: project.packet_version || null,
     };
 
-    await createProjectFromImportedPacket(project, importSource, data);
+    await savePendingClientFlowProject(project, importSource, data);
 
-    let statusHtml = `<div class="alert alert-info">Imported ${escapeHtml(file.name)} and started field capture for ${escapeHtml(project.project_id)}.</div>`;
+    let statusHtml = `<div class="alert alert-info">ClientFlow field handoff imported from ${escapeHtml(file.name)}. Project ${escapeHtml(project.project_id)} is queued for field capture.</div>`;
     if (result.warnings.length) {
       statusHtml += result.warnings.map((w) => `<div class="alert alert-warning">${escapeHtml(w)}</div>`).join('');
     }
     statusEl.innerHTML = statusHtml;
-    $('#intake-autofill-status').innerHTML = statusHtml;
-    showToast('Project imported — field capture in progress', 'success');
+    showToast('Queued for field capture from ClientFlow', 'success');
   } catch (err) {
     console.error(err);
     statusEl.innerHTML = `<div class="alert alert-warning">Import failed: ${escapeHtml(err.message)}</div>`;
@@ -721,6 +845,51 @@ function populateIntakeForm(project) {
 async function handleIntakeSubmit(e) {
   e.preventDefault();
   const pathway = $('#pathway-select').value;
+
+  if (state.pendingImportProject && isPendingClientFlowProject(state.pendingImportProject)) {
+    try {
+      assertXpdPathway(pathway);
+    } catch (err) {
+      alert(err.message);
+      return;
+    }
+
+    const fieldUser = $('#field-user').value.trim();
+    if (!fieldUser) {
+      alert('Field user is required before starting capture.');
+      return;
+    }
+
+    const project = {
+      ...state.pendingImportProject,
+      client_name: $('#client-name').value.trim(),
+      client_company: $('#client-company').value.trim(),
+      client_email: $('#client-email').value.trim(),
+      client_phone: $('#client-phone').value.trim(),
+      project_address: $('#project-address').value.trim(),
+      city: $('#city').value.trim(),
+      state: $('#state').value.trim(),
+      zip: $('#zip').value.trim(),
+      service_pathway: pathway,
+      documentation_level: $('#doc-level').value.trim() || generateShotList(pathway).documentationLevel,
+      documentation_purpose: $('#purpose').value.trim(),
+      stormready_eligible: $('#stormready-eligible').value.trim() || null,
+      field_user: fieldUser,
+      date: $('#project-date').value,
+      weather: $('#weather').value.trim(),
+      site_access_notes: $('#site-access').value.trim(),
+      purpose: $('#purpose').value.trim(),
+      client_notes: $('#client-notes').value.trim(),
+      internal_notes: $('#internal-notes').value.trim(),
+      ...readSiteLocationFields(),
+      aerial_status: AERIAL_PATHWAYS.includes(pathway) ? $('input[name="aerial_status"]:checked')?.value : null,
+      aerial_documentation: AERIAL_PATHWAYS.includes(pathway),
+    };
+
+    await activateClientFlowProject(project);
+    return;
+  }
+
   const isManualStart = !state.importedProjectSource;
 
   try {
@@ -872,10 +1041,14 @@ function populateHomeNotice() {
 
 function updateHomeCTA() {
   const activeId = getActiveProjectId();
-  const hasActive = activeId && state.homeProjects.some((p) => p.project_id === activeId);
+  const activeProject = activeId ? state.homeProjects.find((p) => p.project_id === activeId) : null;
+  const hasActive = activeProject && !isQueuedFieldHandoffProject(activeProject);
+  const nextQueued = getNextQueuedFieldHandoffProject(state.homeProjects);
+  const hasQueued = !!nextQueued;
   const hasProjects = state.homeProjects.length > 0;
 
   $('#btn-continue-project')?.classList.toggle('hidden', !hasActive);
+  $('#btn-start-next-queued')?.classList.toggle('hidden', !hasQueued || hasActive);
 
   const startBtn = $('#btn-start-project');
   if (startBtn) {
@@ -896,7 +1069,52 @@ async function loadHomeScreen() {
   if (filterEl) filterEl.value = 'all';
 
   renderProjectList(state.homeProjects);
+  renderPendingProjectsSection();
   updateHomeCTA();
+}
+
+function renderPendingProjectsSection() {
+  const section = $('#home-pending-section');
+  const listEl = $('#pending-project-list');
+  const countBadge = $('#pending-count-badge');
+  if (!section || !listEl) return;
+
+  const queuedProjects = sortQueuedFieldHandoffProjects(state.homeProjects);
+  const nextProject = queuedProjects[0] || null;
+  section.classList.toggle('hidden', !queuedProjects.length);
+
+  if (countBadge) {
+    countBadge.textContent = `${queuedProjects.length}`;
+  }
+
+  if (!queuedProjects.length) {
+    listEl.innerHTML = '';
+    return;
+  }
+
+  listEl.innerHTML = queuedProjects
+    .map((p) => {
+      const isNext = nextProject?.project_id === p.project_id;
+      return `
+    <div class="project-item project-item-pending${isNext ? ' project-item-next' : ''}" data-project-id="${escapeHtml(p.project_id)}">
+      <div class="project-item-main">
+        <h4>${escapeHtml(p.project_id)} ${isNext ? '<span class="badge badge-pass" style="font-size:0.58rem;vertical-align:middle">Next</span>' : ''}<span class="badge badge-review" style="font-size:0.58rem;vertical-align:middle">Queued</span></h4>
+        <p>${escapeHtml(p.client_name)} · ${escapeHtml(p.service_pathway)}</p>
+        <p class="project-item-meta">${escapeHtml(INBOUND_CLIENTFLOW_HANDOFF_LABEL)} · ${escapeHtml(p.clientflow_request_id || '—')}</p>
+      </div>
+      <span class="badge badge-muted">${escapeHtml(getFieldPacketStatusLabel(p.field_packet_status))}</span>
+      <span class="project-item-chevron" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </div>`;
+    })
+    .join('');
+
+  $$('#pending-project-list .project-item').forEach((el) => {
+    el.addEventListener('click', async () => {
+      await openPendingProjectReview(el.dataset.projectId);
+    });
+  });
 }
 
 function filterProjectList() {
@@ -912,6 +1130,8 @@ function filterProjectList() {
     filtered = filtered.filter((p) => (p.service_pathway || '').startsWith('XPD'));
   } else if (filter === 'stormready') {
     filtered = filtered.filter((p) => (p.service_pathway || '').includes('StormReady'));
+  } else if (filter === 'pending' || filter === 'queued') {
+    filtered = filtered.filter(isQueuedFieldHandoffProject);
   }
 
   if (query) {
@@ -963,24 +1183,38 @@ function renderProjectList(projects, isFiltered = false) {
   emptyEl?.classList.add('hidden');
 
   const activeId = getActiveProjectId();
+  const nextQueued = getNextQueuedFieldHandoffProject(state.homeProjects);
   listEl.innerHTML = projects
-    .map(
-      (p) => `
-    <div class="project-item${p.project_id === activeId ? ' project-item-active' : ''}" data-project-id="${escapeHtml(p.project_id)}">
+    .map((p) => {
+      const isQueued = isQueuedFieldHandoffProject(p);
+      const isNext = isQueued && nextQueued?.project_id === p.project_id;
+      const isActive = p.project_id === activeId && !isQueued;
+      const statusBadge = isQueued
+        ? `${isNext ? '<span class="badge badge-pass" style="font-size:0.58rem;vertical-align:middle">Next</span> ' : ''}<span class="badge badge-review" style="font-size:0.58rem;vertical-align:middle">Queued</span>`
+        : isActive
+          ? ' <span class="badge badge-review" style="font-size:0.58rem;vertical-align:middle">Active</span>'
+          : '';
+      return `
+    <div class="project-item${isActive ? ' project-item-active' : ''}${isQueued ? ' project-item-pending' : ''}${isNext ? ' project-item-next' : ''}" data-project-id="${escapeHtml(p.project_id)}">
       <div class="project-item-main">
-        <h4>${escapeHtml(p.project_id)}${p.project_id === activeId ? ' <span class="badge badge-review" style="font-size:0.58rem;vertical-align:middle">Active</span>' : ''}</h4>
+        <h4>${escapeHtml(p.project_id)}${statusBadge}</h4>
         <p>${escapeHtml(p.client_name)} · ${escapeHtml(p.service_pathway)}</p>
       </div>
-      <span class="badge badge-muted">${escapeHtml(p.date)}</span>
+      <span class="badge badge-muted">${escapeHtml(isQueued ? getFieldPacketStatusLabel(p.field_packet_status) : p.date)}</span>
       <span class="project-item-chevron" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-    </div>`
-    )
+    </div>`;
+    })
     .join('');
 
   $$('.project-item').forEach((el) => {
     el.addEventListener('click', async () => {
+      const project = state.homeProjects.find((p) => p.project_id === el.dataset.projectId);
+      if (project && isQueuedFieldHandoffProject(project)) {
+        await openPendingProjectReview(el.dataset.projectId);
+        return;
+      }
       await loadProject(el.dataset.projectId);
       showScreen('screen-dashboard');
     });
@@ -992,6 +1226,11 @@ function renderProjectList(projects, isFiltered = false) {
 async function loadProject(projectId) {
   const project = await getProject(projectId);
   if (!project) return;
+
+  if (isPendingClientFlowProject(project)) {
+    await openPendingProjectReview(projectId);
+    return;
+  }
 
   if (isXpdPathway(project.service_pathway)) {
     applyXpdCaptureDefaults(project);
@@ -1919,12 +2158,13 @@ async function renderUecsQueueStatus() {
 
   const latest = await getLatestUecsLiteQueueRecord(state.project.project_id);
   if (!latest) {
-    el.innerHTML = '<div class="alert alert-info">Not queued yet. Send when the packet is ready for UECS Lite intake.</div>';
+    el.innerHTML = '<div class="alert alert-info">Not ready for UECS Lite handoff yet. Export the completed field packet first.</div>';
     return;
   }
 
   el.innerHTML = `
     <div class="alert alert-info">
+      <strong>Outbound UECS Lite handoff</strong><br>
       Queue ID: ${escapeHtml(latest.queue_id)}<br>
       Status: ${escapeHtml(latest.status)}<br>
       Validation: ${escapeHtml(latest.validation_status || 'pending')}<br>

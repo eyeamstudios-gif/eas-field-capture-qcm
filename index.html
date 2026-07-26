@@ -91,6 +91,20 @@
           Continue Active Project
         </button>
 
+        <button id="btn-start-next-queued" class="btn btn-primary btn-hero hidden">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M6 4l8 6-8 6V4z" fill="currentColor"/></svg>
+          Start Next Queued Capture
+        </button>
+
+        <div class="card hidden" id="home-pending-section">
+          <div class="card-header-row">
+            <div class="card-header">Queued from ClientFlow</div>
+            <span id="pending-count-badge" class="card-tag">0</span>
+          </div>
+          <p class="card-lead">Inbound ClientFlow field handoffs queued for your next field capture.</p>
+          <div id="pending-project-list" class="project-list"></div>
+        </div>
+
         <div class="card" id="home-recent-projects">
           <div class="card-header-row">
             <div class="card-header">Recent Projects</div>
@@ -103,6 +117,7 @@
             </div>
             <select id="project-filter" class="form-control filter-select" aria-label="Filter projects">
               <option value="all">All projects</option>
+              <option value="queued">Queued from ClientFlow</option>
               <option value="active">Active project</option>
               <option value="xpd">XPD packages</option>
               <option value="stormready">StormReady packages</option>
@@ -128,10 +143,10 @@
 
       <div class="card card-elevated">
         <div class="card-header-row">
-          <div class="card-header">Project Auto-Load</div>
-          <span class="card-tag">UECS Lite</span>
+          <div class="card-header">ClientFlow Handoff Import</div>
+          <span class="card-tag">ClientFlow</span>
         </div>
-        <p class="card-lead">Import a UECS Lite project packet to auto-fill client and site details before capture. UECS Lite import is the preferred project start method.</p>
+        <p class="card-lead">Import a ClientFlow field handoff packet. Projects are queued for field capture until you start on site.</p>
         <input type="file" id="project-import-file" class="hidden" accept="application/json,.json">
         <button id="btn-import-project" class="btn btn-secondary">
           <svg class="btn-icon" viewBox="0 0 20 20" fill="none"><path d="M10 13V3M10 13l-4-4M10 13l4-4M3 15v1a1 1 0 001 1h12a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -290,7 +305,7 @@
         </div>
 
         <div class="btn-group">
-          <button type="submit" class="btn btn-primary">Create Project &amp; Begin Capture</button>
+          <button type="submit" id="btn-intake-submit" class="btn btn-primary">Create Project &amp; Begin Capture</button>
           <button type="button" id="btn-back-home" class="btn btn-ghost">Cancel</button>
         </div>
       </form>
@@ -689,9 +704,9 @@
       <div id="export-status"></div>
 
       <div class="card">
-        <div class="card-header">UECS Lite Delivery</div>
-        <p class="card-lead">Queue the field packet on this device for UECS Lite sync. The queued packet uses the same JSON payload as export.</p>
-        <div class="alert alert-info" id="uecs-lite-clarification">Queued locally for UECS Lite sync. This does not upload in Phase 1. Export files must still be transferred to admin.</div>
+        <div class="card-header">Outbound Handoff to UECS Lite</div>
+        <p class="card-lead">After field capture is complete, hand off the exported packet to UECS Lite for admin review.</p>
+        <div class="alert alert-info" id="uecs-lite-clarification">Ready for UECS Lite handoff. Queued locally on this device — Phase 1 requires manual file transfer to admin.</div>
         <div id="uecs-queue-status"></div>
       </div>
 

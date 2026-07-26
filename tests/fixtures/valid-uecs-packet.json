@@ -1,7 +1,11 @@
 {
   "source_system": "ClientFlow",
+  "packet_type": "clientflow_field_handoff",
   "packet_version": "1.0.0",
   "xpd_only": true,
+  "field_handoff_issued": true,
+  "field_handoff_status": "issued",
+  "field_handoff_issued_at": "2026-07-08T12:00:00.000Z",
   "clientflow_request_id": "cf_req_12345",
   "uecs_project_id": "uecs_proj_67890",
   "client_name": "Jane Homeowner",
