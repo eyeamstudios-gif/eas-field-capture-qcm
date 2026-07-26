@@ -5,7 +5,7 @@ import { authenticatedClient } from '../../lib/server/supabase.js';
 
 const MAX_BODY_BYTES = 128 * 1024;
 
-export default async function handler(request) {
+export async function POST(request) {
   const methodError = requireMethod(request, 'POST');
   if (methodError) return methodError;
   if (!(request.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) {

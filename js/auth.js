@@ -17,7 +17,12 @@ function assertConfig(config) {
 export async function getRuntimeConfig() {
   if (runtimeConfig) return runtimeConfig;
   const response = await fetch('/api/config', { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error('Could not load secure sync configuration.');
+  if (!response.ok) {
+    if (response.status === 503) {
+      throw new Error('Secure sync is not configured on the server yet.');
+    }
+    throw new Error('Could not load secure sync configuration.');
+  }
   runtimeConfig = assertConfig(await response.json());
   return runtimeConfig;
 }

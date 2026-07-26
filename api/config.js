@@ -1,6 +1,6 @@
 import { errorResponse, json, requireMethod } from '../lib/server/http.js';
 
-export default async function handler(request) {
+export async function GET(request) {
   const methodError = requireMethod(request, 'GET');
   if (methodError) return methodError;
 

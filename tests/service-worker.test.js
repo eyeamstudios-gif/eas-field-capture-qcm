@@ -25,7 +25,11 @@ test('service worker includes governance.js and import/export modules', () => {
 });
 
 test('service worker cache version is bumped for production safety', () => {
-  assert.match(swSource, /field-capture-qcm-v1\.1\.0/);
+  assert.match(swSource, /field-capture-qcm-v1\.1\.1/);
+});
+
+test('service worker bypasses sync API routes', () => {
+  assert.match(swSource, /url\.pathname\.startsWith\('\/api\/'\)/);
 });
 
 test('offline modules remain cacheable as a complete app shell set', () => {

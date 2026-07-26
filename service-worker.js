@@ -3,7 +3,7 @@
  * Offline app shell + static asset caching
  */
 
-const CACHE_NAME = 'field-capture-qcm-v1.1.0';
+const CACHE_NAME = 'field-capture-qcm-v1.1.1';
 const ASSETS = [
   '/',
   '/index.html',
@@ -53,9 +53,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) return;
+
+  if (event.request.method !== 'GET') return;
   const networkFirst =
     url.pathname.startsWith('/js/') ||
     url.pathname.endsWith('.js') ||
