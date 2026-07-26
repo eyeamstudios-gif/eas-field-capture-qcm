@@ -578,7 +578,15 @@ export function buildGovernanceBannerHtml(project) {
       <div class="governance-banner-grid">
         <div class="gov-line"><span class="gov-label">Linked to ClientFlow:</span> ${linked}</div>
         <div class="gov-line"><span class="gov-label">ClientFlow Request ID:</span> ${escapeHtml(project.clientflow_request_id || '—')}</div>
+        <div class="gov-line"><span class="gov-label">ClientFlow Project ID:</span> ${escapeHtml(project.clientflow_project_id || '—')}</div>
+        <div class="gov-line"><span class="gov-label">ClientFlow Appointment ID:</span> ${escapeHtml(project.clientflow_appointment_id || '—')}</div>
         <div class="gov-line"><span class="gov-label">UECS Lite Project ID:</span> ${escapeHtml(project.uecs_project_id || project.project_id || '—')}</div>
+        <div class="gov-line"><span class="gov-label">Confirmed Schedule:</span> ${escapeHtml(project.confirmed_schedule_start || project.schedule_start || '—')} ${escapeHtml(project.schedule_timezone || '')}</div>
+        <div class="gov-line"><span class="gov-label">Assignment Role:</span> ${escapeHtml(project.assignment?.role || '—')}</div>
+        <div class="gov-line"><span class="gov-label">Access Window:</span> ${escapeHtml(project.assignment?.access_starts_at || '—')} – ${escapeHtml(project.assignment?.access_ends_at || '—')}</div>
+        <div class="gov-line"><span class="gov-label">Packet Version:</span> ${escapeHtml(project.packet_version || project.handoff_packet_version || '—')}</div>
+        <div class="gov-line"><span class="gov-label">Sync Status:</span> ${escapeHtml(project.sync_status || 'local')}</div>
+        <div class="gov-line"><span class="gov-label">Governance Scope:</span> ${project.governance_locked ? 'LOCKED' : 'LOCAL TEST'}</div>
         <div class="gov-line"><span class="gov-label">Service Pathway:</span> ${escapeHtml(project.service_pathway || '—')}</div>
         <div class="gov-line"><span class="gov-label">Documentation Class:</span> ${escapeHtml(project.documentation_control_classification || DOC_CONTROL_CLASSIFICATION)}</div>
         <div class="gov-line"><span class="gov-label">Documentation Family:</span> ${escapeHtml(project.documentation_family || 'XPD')}</div>

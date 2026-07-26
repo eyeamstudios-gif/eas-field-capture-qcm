@@ -2,7 +2,7 @@
 
 **XPD Field Capture QCM | UECS Lite Intake System**
 
-Phase 1 phone-first PWA for **XPD documentation packages only**. Guides field users through UECS Lite project intake, required shot lists, phone camera capture, per-image QCM scoring, coverage tracking, and structured export for admin review.
+Offline-first phone PWA for **XPD documentation packages only**. Supabase and Vercel Functions provide the secure control plane for authenticated ClientFlow assignments and synchronization; capture, QCM, progress saving, and completion staging continue locally without connectivity.
 
 > **Version 1.0 scope:** Field Capture QCM is intentionally limited to XPD and UECS Lite workflows. Enterprise documentation levels (EAS/EDIS, Levels I–V, spatial, inspection, LiDAR, controlled evidence, etc.) will be implemented in a future Enterprise capture module.
 
@@ -132,7 +132,7 @@ Default integration fields: `review_status: qcm_pending`, `qcm_status: field_qcm
 
 ## Local Storage & Field Data
 
-- **IndexedDB:** projects, images, image blobs, QCM results, shot list status, export records
+- **IndexedDB:** assigned projects, images, image blobs, QCM results, shot list status, export records, authenticated-device context, sync inbox/outbox, handoff receipts, cleanup manifests, and audit tombstones
 - **localStorage:** active project ID
 
 Works fully offline after first load.
@@ -142,13 +142,19 @@ Works fully offline after first load.
 1. Data is local to the device/browser.
 2. Clearing browser data can remove saved projects.
 3. **Export project packet before deleting browser data.**
-4. This is not cloud sync — ClientFlow API sync is a future phase.
+4. First sign-in and initial assignment download require connectivity.
+5. Assignment changes, revocation, and staged events reconcile when connectivity returns.
+6. Unsynchronized work is quarantined for supervisor reconciliation rather than discarded.
 
 ---
 
-## Security / Privacy (Phase 1)
+## Security / Privacy
 
-Phase 1 stores field capture data locally on the user's device until export. **No images or project records are uploaded to a server** unless a future ClientFlow sync endpoint is added.
+ClientFlow handoffs are accepted only by a versioned Vercel receiver that verifies HMAC signatures, timestamp/replay windows, packet hashes, strict schemas, immutable identity mappings, and idempotency keys. Supabase RLS limits project metadata to active assigned users. The service-role key and ClientFlow secret are server-only.
+
+The browser caches only projects assigned to the authenticated account. Cached access windows and revocations block new mutations while preserving already-captured, unsynchronized records for reconciliation. Image blobs remain local in the current synchronization phase; completion metadata and status events use an idempotent outbox.
+
+Copy `.env.example` to `.env.local` for local development. Never place `SUPABASE_SERVICE_ROLE_KEY` or `CLIENTFLOW_HANDOFF_SECRET` in browser-visible variables.
 
 ---
 

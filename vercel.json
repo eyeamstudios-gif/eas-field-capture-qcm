@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "cleanUrls": true,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs22.x",
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/manifest.webmanifest",

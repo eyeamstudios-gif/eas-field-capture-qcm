@@ -12,6 +12,9 @@ test('service worker includes governance.js and import/export modules', () => {
     '/js/governance.js',
     '/js/export.js',
     '/js/storage.js',
+    '/js/auth.js',
+    '/js/sync.js',
+    '/js/cleanup.js',
     '/js/app.js',
     '/js/utils.js',
   ];
@@ -22,7 +25,7 @@ test('service worker includes governance.js and import/export modules', () => {
 });
 
 test('service worker cache version is bumped for production safety', () => {
-  assert.match(swSource, /field-capture-qcm-v1\.0\.4/);
+  assert.match(swSource, /field-capture-qcm-v1\.1\.0/);
 });
 
 test('offline modules remain cacheable as a complete app shell set', () => {

@@ -61,6 +61,32 @@
   <main class="app-main">
     <!-- Home -->
     <section id="screen-home" class="screen active">
+      <div id="auth-panel" class="card card-elevated">
+        <div class="card-header-row">
+          <div class="card-header">Field User Access</div>
+          <span id="auth-state-badge" class="card-tag">Sign-in required</span>
+        </div>
+        <p id="auth-status" class="card-lead">Sign in once while online, then assigned projects remain available offline for their approved access window.</p>
+        <form id="auth-form" class="form-stack">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="auth-email">Email</label>
+              <input type="email" id="auth-email" class="form-control" autocomplete="username" required>
+            </div>
+            <div class="form-group">
+              <label for="auth-password">Password</label>
+              <input type="password" id="auth-password" class="form-control" autocomplete="current-password" required>
+            </div>
+          </div>
+          <button type="submit" id="btn-sign-in" class="btn btn-primary">Sign In &amp; Download Assignments</button>
+        </form>
+        <div id="auth-session-actions" class="action-stack hidden">
+          <button type="button" id="btn-sync-now" class="btn btn-secondary">Sync Assigned Projects</button>
+          <button type="button" id="btn-sign-out" class="btn btn-outline">Sign Out &amp; Lock Local Projects</button>
+        </div>
+        <div id="sync-status" class="card-footer-slot" aria-live="polite"></div>
+      </div>
+
       <div class="hero-panel">
         <p class="hero-eyebrow">Executive Field Documentation</p>
         <h2 class="screen-title hero-title">Capture with confidence.<br>Leave the site ready.</h2>

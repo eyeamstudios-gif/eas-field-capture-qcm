@@ -3,7 +3,7 @@
  * Offline app shell + static asset caching
  */
 
-const CACHE_NAME = 'field-capture-qcm-v1.0.4';
+const CACHE_NAME = 'field-capture-qcm-v1.1.0';
 const ASSETS = [
   '/',
   '/index.html',
@@ -12,6 +12,9 @@ const ASSETS = [
   '/js/app.js',
   '/js/utils.js',
   '/js/storage.js',
+  '/js/auth.js',
+  '/js/sync.js',
+  '/js/cleanup.js',
   '/js/shotlists.js',
   '/js/qcm.js',
   '/js/camera.js',

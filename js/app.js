@@ -45,9 +45,9 @@ import {
   initStorage,
   saveProject,
   getProject,
-  getAllProjects,
   saveImage,
   getProjectImages,
+  getProjectsForAccount,
   saveQcmResult,
   saveShotListStatus,
   getShotListStatus,
@@ -58,6 +58,13 @@ import {
   getActiveProjectId,
   getImageDataUrl,
 } from './storage.js';
+import { getUsableSession, signInWithPassword, signOut } from './auth.js';
+import {
+  canPerformProjectAction,
+  flushSyncOutbox,
+  queueStatusEvent,
+  synchronizeNow,
+} from './sync.js';
 
 import { runQcmAnalysis, computeCoverageSummary, computeProjectQcmSummary } from './qcm.js';
 import { CameraCapture, createFileInputCapture } from './camera.js';
@@ -143,6 +150,8 @@ const state = {
   importedProjectSource: null,
   pendingImportProject: null,
   homeProjects: [],
+  authSession: null,
+  syncInProgress: false,
 };
 
 async function init() {
@@ -151,7 +160,10 @@ async function init() {
     await initStorage();
     registerServiceWorker();
     updateOnlineStatus();
-    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('online', () => {
+      updateOnlineStatus();
+      handleSyncNow({ silent: true }).catch(console.warn);
+    });
     window.addEventListener('offline', updateOnlineStatus);
 
     bindEvents();
@@ -160,7 +172,11 @@ async function init() {
     populateOverrideReasons();
     setupMobileOptimizations();
     populateHomeNotice();
+    await refreshAuthState();
     await loadHomeScreen();
+    if (navigator.onLine && state.authSession) {
+      handleSyncNow({ silent: true }).catch(console.warn);
+    }
   } catch (err) {
     console.error('App init failed:', err);
     const home = document.getElementById('screen-home');
@@ -192,6 +208,76 @@ function updateOnlineStatus() {
     else el.textContent = 'Offline';
     el.classList.remove('online');
   }
+}
+
+async function refreshAuthState() {
+  state.authSession = await getUsableSession();
+  const signedIn = !!state.authSession?.account_id;
+  $('#auth-form')?.classList.toggle('hidden', signedIn);
+  $('#auth-session-actions')?.classList.toggle('hidden', !signedIn);
+  const badge = $('#auth-state-badge');
+  const status = $('#auth-status');
+  if (badge) badge.textContent = signedIn ? (state.authSession.offline_only ? 'Offline session' : 'Authenticated') : 'Sign-in required';
+  if (status) {
+    status.textContent = signedIn
+      ? `Signed in as ${state.authSession.user?.email || state.authSession.account_id}. Only assigned projects are shown on this device.`
+      : 'Sign in once while online, then assigned projects remain available offline for their approved access window.';
+  }
+  $('#btn-start-project')?.classList.add('hidden');
+  $('#btn-import-project')?.toggleAttribute('disabled', true);
+}
+
+async function handleSignIn(event) {
+  event.preventDefault();
+  const button = $('#btn-sign-in');
+  if (button) button.disabled = true;
+  try {
+    await signInWithPassword($('#auth-email').value.trim(), $('#auth-password').value);
+    $('#auth-password').value = '';
+    await refreshAuthState();
+    await handleSyncNow();
+    showToast('Signed in and assignments downloaded.', 'success');
+  } catch (error) {
+    $('#sync-status').innerHTML = `<div class="alert alert-warning">${escapeHtml(error.message)}</div>`;
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function handleSignOut() {
+  await signOut();
+  state.authSession = null;
+  state.project = null;
+  state.homeProjects = [];
+  await refreshAuthState();
+  await loadHomeScreen();
+  showToast('Signed out. Local projects are locked until this user signs in again.', 'info');
+}
+
+async function handleSyncNow({ silent = false } = {}) {
+  if (state.syncInProgress || !state.authSession || !navigator.onLine) return;
+  state.syncInProgress = true;
+  const button = $('#btn-sync-now');
+  if (button) button.disabled = true;
+  if (!silent) $('#sync-status').innerHTML = '<div class="alert alert-info">Synchronizing assignments and staged events…</div>';
+  try {
+    const result = await synchronizeNow();
+    await refreshAuthState();
+    await loadHomeScreen();
+    $('#sync-status').innerHTML = `<div class="alert alert-info">Sync complete. ${result.pull?.downloaded || 0} assignment update(s) downloaded; ${result.push?.sent || 0} event(s) sent.</div>`;
+  } catch (error) {
+    $('#sync-status').innerHTML = `<div class="alert alert-warning">Sync paused: ${escapeHtml(error.message)} Local field work remains available.</div>`;
+  } finally {
+    state.syncInProgress = false;
+    if (button) button.disabled = false;
+  }
+}
+
+function requireProjectAction(action) {
+  if (!state.project?.assignment) {
+    return { allowed: !!state.project?.is_test_project, reason: 'This project has no approved assignment.' };
+  }
+  return canPerformProjectAction(state.project, action);
 }
 
 function setupMobileOptimizations() {
@@ -229,6 +315,9 @@ function setupMobileOptimizations() {
 
 function bindEvents() {
   $('#btn-theme-toggle')?.addEventListener('click', toggleTheme);
+  $('#auth-form')?.addEventListener('submit', handleSignIn);
+  $('#btn-sign-out')?.addEventListener('click', handleSignOut);
+  $('#btn-sync-now')?.addEventListener('click', () => handleSyncNow());
 
   $('#btn-start-project')?.addEventListener('click', () => {
     resetIntakeForm();
@@ -589,6 +678,11 @@ function onPathwayChange() {
 async function activateClientFlowProject(project) {
   const pathway = project.service_pathway;
   assertXpdPathway(pathway);
+  const access = canPerformProjectAction(project, 'capture');
+  if (!access.allowed) {
+    showToast(access.reason, 'warning');
+    return;
+  }
 
   project.updated_at = formatDateTime();
   project.import_method = 'uecs_lite';
@@ -636,6 +730,10 @@ async function activateClientFlowProject(project) {
     queueRecord.source_packet_version = project.import_source.packet_version;
   }
   await saveUecsLiteQueueRecord(queueRecord);
+  await queueStatusEvent(project.project_id, 'field_work_started', {
+    assignment_id: project.assignment?.assignment_id,
+    correlation_id: project.correlation_id,
+  });
   state.activeQueueId = queueRecord.queue_id;
 
   if (isSfm()) {
@@ -1060,7 +1158,9 @@ function updateHomeCTA() {
 }
 
 async function loadHomeScreen() {
-  const projects = await getAllProjects();
+  const projects = state.authSession?.account_id
+    ? await getProjectsForAccount(state.authSession.account_id)
+    : [];
   state.homeProjects = projects.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
 
   const searchEl = $('#project-search');
@@ -1138,6 +1238,9 @@ function filterProjectList() {
     filtered = filtered.filter((p) => {
       const haystack = [
         p.project_id,
+        p.clientflow_project_id,
+        p.clientflow_appointment_id,
+        p.clientflow_request_id,
         p.client_name,
         p.client_company,
         p.project_address,
@@ -1199,6 +1302,7 @@ function renderProjectList(projects, isFiltered = false) {
       <div class="project-item-main">
         <h4>${escapeHtml(p.project_id)}${statusBadge}</h4>
         <p>${escapeHtml(p.client_name)} · ${escapeHtml(p.service_pathway)}</p>
+        <p class="project-item-meta">${escapeHtml(p.assignment?.role || 'Unassigned')} · ${escapeHtml(p.assignment?.status || 'unknown access')} · ${escapeHtml(p.confirmed_schedule_start || p.schedule_start || 'Schedule pending')} · ${escapeHtml(p.sync_status || 'local')}</p>
       </div>
       <span class="badge badge-muted">${escapeHtml(isQueued ? getFieldPacketStatusLabel(p.field_packet_status) : p.date)}</span>
       <span class="project-item-chevron" aria-hidden="true">
@@ -1226,6 +1330,15 @@ function renderProjectList(projects, isFiltered = false) {
 async function loadProject(projectId) {
   const project = await getProject(projectId);
   if (!project) return;
+  if (project.local_owner_account_id !== state.authSession?.account_id) {
+    showToast('This cached project belongs to another signed-in user.', 'warning');
+    return;
+  }
+  const viewAccess = canPerformProjectAction(project, 'view');
+  if (!viewAccess.allowed) {
+    showToast(viewAccess.reason, 'warning');
+    return;
+  }
 
   if (isPendingClientFlowProject(project)) {
     await openPendingProjectReview(projectId);
@@ -1706,6 +1819,11 @@ function handleFinishCapture() {
 }
 
 function openCaptureScreen() {
+  const access = requireProjectAction('capture');
+  if (!access.allowed) {
+    showToast(access.reason, 'warning');
+    return;
+  }
   populateCaptureZoneSelect();
   resetCaptureScreen();
   initCamera();
@@ -1953,6 +2071,11 @@ function renderQcmResult(qcm, zone) {
 }
 
 async function handleAcceptImage() {
+  const access = requireProjectAction('capture');
+  if (!access.allowed) {
+    showToast(access.reason, 'warning');
+    return;
+  }
   if (!state.pendingCapture?.imageMeta) {
     await handleRunQcm();
     if (!state.pendingCapture?.imageMeta) return;
@@ -1989,7 +2112,14 @@ async function handleAcceptImage() {
   await saveShotListStatus({ project_id: state.project.project_id, shotList: state.shotList, sfm: state.sfm });
 
   state.project.updated_at = formatDateTime();
+  state.project.unsynchronized_changes = true;
+  state.project.sync_status = 'pending_upload';
   await saveProject(state.project);
+  await queueStatusEvent(state.project.project_id, 'capture_item_completed', {
+    image_id: meta.image_id,
+    assignment_id: state.project.assignment?.assignment_id,
+  });
+  if (navigator.onLine) flushSyncOutbox().catch(console.warn);
 
   resetCaptureScreen();
   renderDashboard();
@@ -2192,6 +2322,11 @@ async function updateQueueForCaptureProgress(coverage) {
 
 async function handleExport() {
   if (!state.project) return;
+  const access = requireProjectAction('submit');
+  if (!access.allowed) {
+    showToast(access.reason, 'warning');
+    return;
+  }
   state.shotList = updateZoneStatus(state.shotList, state.images);
   if (state.sfm) state.sfm = updateSimpleFieldProgress(state.sfm, state.images);
 
@@ -2238,6 +2373,11 @@ async function handleExport() {
       export_complete: true,
       completed_field_packet: result.completedPacket,
     });
+    await queueStatusEvent(state.project.project_id, 'field_submission_ready', {
+      receipt_id: result.export_id,
+      packet_version: result.completedPacket?.packet_version,
+    });
+    if (navigator.onLine) flushSyncOutbox().catch(console.warn);
 
     $('#export-status').innerHTML = `<div class="alert alert-info">Export complete. ${result.files.length} files downloaded.<br>Status: ${readinessLabel(result.coverage.readiness)}<br>Ready for admin QCM review. Transfer export files to admin.</div>`;
     showToast(`Export complete — ${result.files.length} files`, 'success');
