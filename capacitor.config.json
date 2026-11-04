@@ -1,0 +1,8 @@
+{
+  "appId": "com.eyeamstudios.fieldcaptureqcm",
+  "appName": "EAS Field Capture QCM",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
